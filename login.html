@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ハイブリッド申請承認システムの構築 - ログイン画面</title>
+  <style>
+    :root {
+      --primary: #d4af37;
+      --primary-hover: #b8941f;
+      --bg-main: #fefdf8;
+      --bg-card: #f9f7f0;
+      --bg-sidebar: #f5f2e8;
+      --border: #e8e3d3;
+      --text: #2d2a1f;
+      --text-muted: #5a5445;
+      --top-bar-bg: #f7f4ea;
+      --top-bar-border: #ebe6d6;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #fefdf8 0%, #f7f4ea 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+      padding: 2rem;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      box-shadow: 0 4px 20px rgba(45, 42, 31, 0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .system-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      font-size: 1.5rem;
+      color: white;
+    }
+
+    .login-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .login-subtitle {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--bg-main);
+      color: var(--text);
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+    }
+
+    .login-button {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 1.5rem;
+    }
+
+    .login-button:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .login-button:active {
+      transform: translateY(0);
+    }
+
+    .sample-notice {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 1rem;
+      background: rgba(212, 175, 55, 0.05);
+      border-radius: 6px;
+      border: 1px solid rgba(212, 175, 55, 0.1);
+    }
+
+    @media (max-width: 480px) {
+      .login-container {
+        padding: 1rem;
+      }
+
+      .login-card {
+        padding: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="system-icon">🍂</div>
+        <h1 class="login-title" data-testid="login-title">ログイン</h1>
+        <p class="login-subtitle">ハイブリッド申請承認システム</p>
+      </div>
+
+      <form data-testid="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="username">ユーザー名</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            class="form-input"
+            data-testid="username"
+            placeholder="ユーザー名を入力"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">パスワード</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            class="form-input"
+            data-testid="password"
+            placeholder="パスワードを入力"
+          >
+        </div>
+
+        <button type="submit" class="login-button" data-testid="login-button">
+          ログイン
+        </button>
+      </form>
+
+      <div class="sample-notice">
+        サンプル実装ではどの入力でもログインできます
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelector('[data-testid="login-form"]').addEventListener('submit', function(e) {
+      e.preventDefault();
+      window.location.href = './index.html';
+    });
+  </script>
+</body>
+</html>
