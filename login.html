@@ -6,16 +6,16 @@
   <title>ハイブリッド申請承認システムの構築 - ログイン画面</title>
   <style>
     :root {
-      --primary: #4a5568;
-      --primary-hover: #2d3748;
-      --bg-main: #fefefe;
-      --bg-card: #f7fafc;
-      --bg-sidebar: #edf2f7;
-      --border: #e2e8f0;
-      --text: #2d3748;
-      --text-muted: #4a5568;
+      --primary: #ff6b9d;
+      --primary-hover: #ff4d8a;
+      --bg-main: #fafafa;
+      --bg-card: #ffffff;
+      --bg-sidebar: #f5f5f5;
+      --border: #e8e8e8;
+      --text: #2d2d2d;
+      --text-muted: #666666;
       --top-bar-bg: #ffffff;
-      --top-bar-border: #cbd5e0;
+      --top-bar-border: #f0f0f0;
     }
 
     * {
@@ -25,53 +25,55 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, var(--bg-main) 0%, #f0f0f0 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      color: var(--text);
     }
 
     .login-container {
       background: var(--bg-card);
       border-radius: 16px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+      padding: 48px 40px;
       width: 100%;
       max-width: 400px;
-      padding: 48px 40px;
-      position: relative;
-      overflow: hidden;
+      border: 1px solid var(--border);
     }
 
-    .login-container::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-    }
-
-    .login-header {
+    .logo-section {
       text-align: center;
       margin-bottom: 32px;
     }
 
+    .logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      border-radius: 12px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
     .login-title {
-      color: var(--text);
       font-size: 24px;
       font-weight: 600;
+      color: var(--text);
       margin-bottom: 8px;
-      line-height: 1.3;
     }
 
     .login-subtitle {
       color: var(--text-muted);
       font-size: 14px;
-      font-weight: 400;
     }
 
     .form-group {
@@ -80,32 +82,32 @@
 
     .form-label {
       display: block;
-      color: var(--text);
       font-size: 14px;
       font-weight: 500;
-      margin-bottom: 6px;
+      color: var(--text);
+      margin-bottom: 8px;
     }
 
     .form-input {
       width: 100%;
       padding: 12px 16px;
-      border: 2px solid var(--border);
+      border: 1.5px solid var(--border);
       border-radius: 8px;
       font-size: 16px;
+      background: var(--bg-card);
       color: var(--text);
-      background: var(--bg-main);
       transition: all 0.2s ease;
-      outline: none;
     }
 
     .form-input:focus {
+      outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
+      box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
     }
 
     .login-button {
       width: 100%;
-      padding: 14px 24px;
+      padding: 14px;
       background: var(--primary);
       color: white;
       border: none;
@@ -120,43 +122,36 @@
     .login-button:hover {
       background: var(--primary-hover);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(74, 85, 104, 0.3);
+      box-shadow: 0 4px 16px rgba(255, 107, 157, 0.3);
     }
 
     .login-button:active {
       transform: translateY(0);
     }
 
-    .login-footer {
+    .footer-note {
+      text-align: center;
       margin-top: 32px;
       padding-top: 24px;
       border-top: 1px solid var(--border);
-      text-align: center;
-    }
-
-    .sample-notice {
-      color: var(--text-muted);
       font-size: 12px;
-      line-height: 1.4;
+      color: var(--text-muted);
     }
 
     @media (max-width: 480px) {
       .login-container {
         padding: 32px 24px;
-        margin: 16px;
-      }
-      
-      .login-title {
-        font-size: 20px;
+        margin: 0 16px;
       }
     }
   </style>
 </head>
 <body>
   <div class="login-container">
-    <div class="login-header">
-      <h1 class="login-title" data-testid="login-title">ハイブリッド申請承認システム</h1>
-      <p class="login-subtitle">アカウントにサインイン</p>
+    <div class="logo-section">
+      <div class="logo">H</div>
+      <h1 class="login-title" data-testid="login-title">ログイン</h1>
+      <p class="login-subtitle">ハイブリッド申請承認システムの構築</p>
     </div>
 
     <form data-testid="login-form" novalidate>
@@ -189,10 +184,8 @@
       </button>
     </form>
 
-    <div class="login-footer">
-      <p class="sample-notice">
-        サンプル実装ではどの入力でもログインできます
-      </p>
+    <div class="footer-note">
+      サンプル実装ではどの入力でもログインできます
     </div>
   </div>
 
