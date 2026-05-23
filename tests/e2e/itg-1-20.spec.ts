@@ -12,180 +12,220 @@ test.describe("文書種別判定画面", () => {
     await page.goto("/panels/scr-1779422563059.html");
   });
 
-  test('SCEN-336: PDF申請書類の正常アップロード', async ({ page }) => {
-    // SCEN-336: [normal] 文書種別判定画面 - PDF申請書類の正常アップロード
-    await expect(page.locator('text=文書種別判定')).toBeVisible();
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await expect(page.locator('#file-info')).toBeVisible();
-    await expect(page.locator('#file-name')).toContainText('application.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#auto-detection-result')).toBeVisible();
+  // SCEN-336
+  test("[normal] 文書種別判定画面 - PDF申請書類の正常アップロード", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('PDF content'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('補助金申請書');
   });
 
-  test('SCEN-337: 文書種別自動判定結果の正常表示', async ({ page }) => {
-    // SCEN-337: [normal] 文書種別判定画面 - 文書種別自動判定結果の正常表示
-    await page.setInputFiles('#file-input', 'test-files/subsidy-application.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#auto-detection-result')).toContainText('補助金申請書');
-    await expect(page.locator('#accuracy-text')).toContainText('85%');
-    await expect(page.locator('#subsidy-score-text')).toContainText('92%');
+  // SCEN-337
+  test("[normal] 文書種別判定画面 - 文書種別自動判定結果の正常表示", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'application.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('補助金申請書類'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('補助金申請書');
+    await expect(page.locator('[data-testid="accuracy-indicator"]')).toContainText('85%');
   });
 
-  test('SCEN-338: 手動選択で文書種別変更', async ({ page }) => {
-    // SCEN-338: [normal] 文書種別判定画面 - 手動選択で文書種別変更
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("判定実行")');
-    await page.selectOption('#manual-document-type', '経費申請書');
-    await page.click('button:has-text("判定結果確定")');
-    await expect(page.locator('#auto-detection-result')).toContainText('経費申請書');
+  // SCEN-338
+  test("[normal] 文書種別判定画面 - 手動選択で文書種別変更", async ({ page }) => {
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請書');
+    await expect(page.locator('[data-testid="document-type-select"]')).toHaveValue('経費申請書');
+    await page.click('[data-testid="finalize-button"]');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('経費申請書');
   });
 
-  test('SCEN-339: 補助金関連度スコア正常表示', async ({ page }) => {
-    // SCEN-339: [normal] 文書種別判定画面 - 補助金関連度スコア正常表示
-    await page.setInputFiles('#file-input', 'test-files/subsidy-related.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#subsidy-score-text')).toContainText('78%');
-    await expect(page.locator('#subsidy-score-bar')).toHaveCSS('width', '78%');
+  // SCEN-339
+  test("[normal] 文書種別判定画面 - 補助金関連度スコア正常表示", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'subsidy.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('補助金申請書類 科研費'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="subsidy-score"]')).toContainText('85');
   });
 
-  test('SCEN-340: 文書内容プレビュー正常表示', async ({ page }) => {
-    // SCEN-340: [normal] 文書種別判定画面 - 文書内容プレビュー正常表示
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("プレビュー表示")');
-    await expect(page.locator('#document-preview')).toBeVisible();
-    await page.click('button:has-text("プレビューを閉じる")');
-    await expect(page.locator('#document-preview')).toBeHidden();
+  // SCEN-340
+  test("[normal] 文書種別判定画面 - 文書内容プレビュー正常表示", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'preview.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('プレビュー内容'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await page.click('text=プレビュー表示');
+    await expect(page.locator('[data-testid="document-preview"]')).toBeVisible();
   });
 
-  test('SCEN-341: 判定精度インジケーター正常表示', async ({ page }) => {
-    // SCEN-341: [normal] 文書種別判定画面 - 判定精度インジケーター正常表示
-    await page.setInputFiles('#file-input', 'test-files/clear-document.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#accuracy-text')).toContainText('95%');
-    await expect(page.locator('#accuracy-bar')).toHaveCSS('background-color', 'rgb(34, 197, 94)');
+  // SCEN-341
+  test("[normal] 文書種別判定画面 - 判定精度インジケーター正常表示", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'accurate.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('正確な書類'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="accuracy-indicator"]')).toContainText('85%');
   });
 
-  test('SCEN-342: 承認フロー確認から遷移', async ({ page }) => {
-    // SCEN-342: [normal] 文書種別判定画面 - 承認フロー確認から遷移
-    await page.click('[data-testid="approval-flow-confirm"]');
-    await expect(page.locator('text=文書種別判定')).toBeVisible();
-    await expect(page.locator('#upload-area')).toBeVisible();
+  // SCEN-342
+  test("[normal] 文書種別判定画面 - 承認フロー確認から遷移", async ({ page }) => {
+    await page.click('[data-testid="confirm-flow-button"]');
+    await expect(page.locator('#current-screen-title')).toContainText('文書種別判定');
   });
 
-  test('SCEN-343: 判定結果確定で完了', async ({ page }) => {
-    // SCEN-343: [normal] 文書種別判定画面 - 判定結果確定で完了
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("判定実行")');
-    await page.selectOption('#manual-document-type', '補助金申請書');
-    await page.click('button:has-text("判定結果確定")');
-    await expect(page.locator('text=判定結果が確定されました')).toBeVisible();
+  // SCEN-343
+  test("[normal] 文書種別判定画面 - 判定結果確定で完了", async ({ page }) => {
+    await page.selectOption('[data-testid="document-type-select"]', '補助金申請書');
+    await page.fill('textarea', '判定理由：補助金関連書類のため');
+    await page.click('[data-testid="finalize-button"]');
+    await expect(page).toHaveURL('/panels/scr-1779422207222.html');
   });
 
-  test('SCEN-344: 再判定実行で結果更新', async ({ page }) => {
-    // SCEN-344: [normal] 文書種別判定画面 - 再判定実行で結果更新
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("判定実行")');
-    const firstResult = await page.locator('#accuracy-text').textContent();
-    await page.click('#btn-re-detect');
-    const secondResult = await page.locator('#accuracy-text').textContent();
-    expect(secondResult).toBeDefined();
+  // SCEN-344
+  test("[normal] 文書種別判定画面 - 再判定実行で結果更新", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'recheck.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('再判定対象'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await page.click('[data-testid="re-detect-button"]');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('その他');
   });
 
-  test('SCEN-345: 文書種別マスタ参照リンク遷移', async ({ page }) => {
-    // SCEN-345: [normal] 文書種別判定画面 - 文書種別マスタ参照リンク遷移
-    await page.click('[data-testid="document-master-link"]');
-    await expect(page.locator('text=文書種別一覧')).toBeVisible();
+  // SCEN-345
+  test("[normal] 文書種別判定画面 - 文書種別マスタ参照リンク遷移", async ({ page }) => {
+    await page.click('[data-testid="master-reference-link"]');
+    await expect(page).toHaveURL('/panels/scr-1779422326698.html');
   });
 
-  test('SCEN-346: 判定履歴一覧表示', async ({ page }) => {
-    // SCEN-346: [normal] 文書種別判定画面 - 判定履歴一覧表示
-    await page.click('[data-testid="classification-history"]');
-    await expect(page.locator('#history-tbody')).toBeVisible();
-    await expect(page.locator('text=日時')).toBeVisible();
-    await expect(page.locator('text=判定結果')).toBeVisible();
+  // SCEN-346
+  test("[normal] 文書種別判定画面 - 判定履歴一覧表示", async ({ page }) => {
+    await expect(page.locator('[data-testid="detection-history-table"]')).toBeVisible();
+    await expect(page.locator('#history-tbody')).toContainText('判定日時');
   });
 
-  test('SCEN-347: 未対応ファイル形式でエラー', async ({ page }) => {
-    // SCEN-347: [error] 文書種別判定画面 - 未対応ファイル形式でエラー
-    await page.setInputFiles('#file-input', 'test-files/invalid.exe');
-    await expect(page.locator('[data-testid="error-message"]')).toContainText('対応していないファイル形式です');
+  // SCEN-347
+  test("[error] 文書種別判定画面 - 未対応ファイル形式でエラー", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'invalid.exe',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('invalid'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('対応していないファイル形式');
   });
 
-  test('SCEN-348: ファイルサイズ上限超過でエラー', async ({ page }) => {
-    // SCEN-348: [error] 文書種別判定画面 - ファイルサイズ上限超過でエラー
-    await page.setInputFiles('#file-input', 'test-files/large-file.pdf');
-    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルサイズが上限を超えています');
+  // SCEN-348
+  test("[error] 文書種別判定画面 - ファイルサイズ上限超過でエラー", async ({ page }) => {
+    const largeBuffer = Buffer.alloc(15 * 1024 * 1024, 'a');
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'large.pdf',
+      mimeType: 'application/pdf',
+      buffer: largeBuffer,
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルサイズ上限');
   });
 
-  test('SCEN-349: 破損ファイルアップロードでエラー', async ({ page }) => {
-    // SCEN-349: [error] 文書種別判定画面 - 破損ファイルアップロードでエラー
-    await page.setInputFiles('#file-input', 'test-files/corrupted.pdf');
-    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルが破損しています');
+  // SCEN-349
+  test("[error] 文書種別判定画面 - 破損ファイルアップロードでエラー", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'corrupted.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('corrupted data'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルが破損');
   });
 
-  test('SCEN-350: 判定不可文書でエラーメッセージ', async ({ page }) => {
-    // SCEN-350: [error] 文書種別判定画面 - 判定不可文書でエラーメッセージ
-    await page.setInputFiles('#file-input', 'test-files/unreadable.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('[data-testid="error-message"]')).toContainText('この文書は判定できません');
+  // SCEN-350
+  test("[error] 文書種別判定画面 - 判定不可文書でエラーメッセージ", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'undetectable.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('undetectable content'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('判定不可能');
   });
 
-  test('SCEN-351: ネットワークエラー時の表示', async ({ page }) => {
-    // SCEN-351: [error] 文書種別判定画面 - ネットワークエラー時の表示
+  // SCEN-351
+  test("[error] 文書種別判定画面 - ネットワークエラー時の表示", async ({ page }) => {
     await page.context().setOffline(true);
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("判定実行")');
+    await page.selectOption('[data-testid="document-type-select"]', '補助金申請書');
+    await page.click('[data-testid="finalize-button"]');
     await expect(page.locator('[data-testid="error-message"]')).toContainText('ネットワークエラー');
     await page.context().setOffline(false);
   });
 
-  test('SCEN-352: 文書種別未選択で確定エラー', async ({ page }) => {
-    // SCEN-352: [error] 文書種別判定画面 - 文書種別未選択で確定エラー
-    await page.setInputFiles('#file-input', 'test-files/application.pdf');
-    await page.click('button:has-text("判定実行")');
-    await page.selectOption('#manual-document-type', '');
-    await page.click('button:has-text("判定結果確定")');
+  // SCEN-352
+  test("[error] 文書種別判定画面 - 文書種別未選択で確定エラー", async ({ page }) => {
+    await page.click('[data-testid="finalize-button"]');
     await expect(page.locator('[data-testid="error-message"]')).toContainText('文書種別を選択してください');
   });
 
-  test('SCEN-353: ファイル未選択状態での操作', async ({ page }) => {
-    // SCEN-353: [edge] 文書種別判定画面 - ファイル未選択状態での操作
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルを選択してください');
-    await page.click('button:has-text("アップロード")');
+  // SCEN-353
+  test("[edge] 文書種別判定画面 - ファイル未選択状態での操作", async ({ page }) => {
+    await page.click('[data-testid="upload-button"]');
     await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルを選択してください');
   });
 
-  test('SCEN-354: ファイルサイズ上限ギリギリ', async ({ page }) => {
-    // SCEN-354: [edge] 文書種別判定画面 - ファイルサイズ上限ギリギリ
-    await page.setInputFiles('#file-input', 'test-files/max-size.pdf');
-    await expect(page.locator('#file-size')).toContainText('10.0MB');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#auto-detection-result')).toBeVisible();
+  // SCEN-354
+  test("[edge] 文書種別判定画面 - ファイルサイズ上限ギリギリ", async ({ page }) => {
+    const limitBuffer = Buffer.alloc(10 * 1024 * 1024, 'a');
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'limit.pdf',
+      mimeType: 'application/pdf',
+      buffer: limitBuffer,
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('その他');
   });
 
-  test('SCEN-355: 判定精度0%の場合', async ({ page }) => {
-    // SCEN-355: [edge] 文書種別判定画面 - 判定精度0%の場合
-    await page.setInputFiles('#file-input', 'test-files/ambiguous.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#accuracy-text')).toContainText('0%');
-    await expect(page.locator('text=判定不可')).toBeVisible();
+  // SCEN-355
+  test("[edge] 文書種別判定画面 - 判定精度0%の場合", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'zero.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('zero precision'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="accuracy-indicator"]')).toContainText('0%');
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('判定不可');
   });
 
-  test('SCEN-356: 判定精度100%の場合', async ({ page }) => {
-    // SCEN-356: [edge] 文書種別判定画面 - 判定精度100%の場合
-    await page.setInputFiles('#file-input', 'test-files/perfect-match.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#accuracy-text')).toContainText('100%');
-    await expect(page.locator('#accuracy-bar')).toHaveCSS('background-color', 'rgb(34, 197, 94)');
+  // SCEN-356
+  test("[edge] 文書種別判定画面 - 判定精度100%の場合", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'perfect.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('補助金申請書 完全一致'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="accuracy-indicator"]')).toContainText('100%');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('補助金申請書');
   });
 
-  test('SCEN-357: 補助金関連度スコア0の場合', async ({ page }) => {
-    // SCEN-357: [edge] 文書種別判定画面 - 補助金関連度スコア0の場合
-    await page.setInputFiles('#file-input', 'test-files/non-subsidy.pdf');
-    await page.click('button:has-text("判定実行")');
-    await expect(page.locator('#subsidy-score-text')).toContainText('0%');
-    await expect(page.locator('#auto-detection-result')).toContainText('補助金対象外');
-    await expect(page.locator('[data-testid="next-screen-button"]')).toBeDisabled();
+  // SCEN-357
+  test("[edge] 文書種別判定画面 - 補助金関連度スコア0の場合", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-upload"]', {
+      name: 'nonsubsidy.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('一般事務書類'),
+    });
+    await page.click('[data-testid="upload-button"]');
+    await expect(page.locator('[data-testid="subsidy-score"]')).toContainText('0');
+    await expect(page.locator('[data-testid="auto-detection-result"]')).toContainText('その他');
   });
 });

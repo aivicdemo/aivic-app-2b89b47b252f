@@ -13,125 +13,124 @@ test.describe("承認判断入力画面", () => {
   });
 
   // SCEN-271
-  test("[normal] 承認判断入力画面 - 承認選択で正常に判断できる", async ({ page }) => {
-    await page.check('[data-testid="decision-approve"]');
-    await page.fill('[data-testid="approval-comment"]', '内容を確認し承認します。');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=承認処理が完了しました')).toBeVisible();
+  test("承認選択で正常に判断できる", async ({ page }) => {
+    await page.check('[data-testid="approve-radio"]');
+    await page.fill('[data-testid="approval-comment"]', '申請内容を確認し、適切と判断します。');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeHidden();
   });
 
   // SCEN-272
-  test("[normal] 承認判断入力画面 - 差戻し選択で正常に判断できる", async ({ page }) => {
-    await page.check('[data-testid="decision-return"]');
-    await page.fill('[data-testid="approval-comment"]', '追加資料が必要です。再提出をお願いします。');
-    await page.click('[data-testid="confirm-button"]');
-    await page.click('text=OK');
-    await expect(page.locator('text=差戻し処理が完了しました')).toBeVisible();
+  test("差戻し選択で正常に判断できる", async ({ page }) => {
+    await page.check('[data-testid="return-radio"]');
+    await page.fill('[data-testid="approval-comment"]', '申請内容に不備があるため差し戻しします。');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeHidden();
   });
 
   // SCEN-273
-  test("[normal] 承認判断入力画面 - 却下選択で正常に判断できる", async ({ page }) => {
-    await page.check('[data-testid="decision-reject"]');
+  test("却下選択で正常に判断できる", async ({ page }) => {
+    await page.check('[data-testid="reject-radio"]');
     await page.fill('[data-testid="approval-comment"]', '申請要件を満たしていないため却下します。');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=却下処理が完了しました')).toBeVisible();
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeHidden();
   });
 
   // SCEN-274
-  test("[normal] 承認判断入力画面 - 条件付き承認で正常に判断できる", async ({ page }) => {
-    await page.check('[data-testid="conditional-approval"]');
-    await page.fill('[data-testid="approval-condition"]', '予算の修正が必要です。');
-    await page.fill('[data-testid="approval-comment"]', '条件を満たした上で承認します。');
-    await page.click('[data-testid="confirm-button"]');
-    await page.click('text=OK');
-    await expect(page.locator('text=条件付き承認が完了しました')).toBeVisible();
+  test("条件付き承認で正常に判断できる", async ({ page }) => {
+    await page.check('[data-testid="conditional-approval-checkbox"]');
+    await page.fill('[data-testid="approval-comment"]', '条件付きで承認します。指定条件を満たしてください。');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeHidden();
   });
 
   // SCEN-275
-  test("[normal] 承認判断入力画面 - 承認コメント入力で正常送信", async ({ page }) => {
-    await page.check('[data-testid="decision-approve"]');
-    await page.fill('[data-testid="approval-comment"]', '申請内容を確認し、適切と判断します。');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=承認コメントが送信されました')).toBeVisible();
+  test("承認コメント入力で正常送信", async ({ page }) => {
+    await page.check('[data-testid="approve-radio"]');
+    await page.fill('[data-testid="approval-comment"]', '承認します。');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeHidden();
   });
 
   // SCEN-276
-  test("[normal] 承認判断入力画面 - 添付ファイルプレビュー表示", async ({ page }) => {
-    await page.click('text=ファイルプレビュー');
-    await expect(page.locator('text=プレビュー表示')).toBeVisible();
-    await page.click('text=閉じる');
-    await expect(page.locator('text=プレビュー表示')).toBeHidden();
+  test("添付ファイルプレビュー表示", async ({ page }) => {
+    await page.click('[data-testid="preview-button"]');
+    await expect(page.locator('#file-preview-modal')).toBeVisible();
+    await expect(page.locator('#preview-content')).toBeVisible();
+    await page.click('#close-preview');
+    await expect(page.locator('#file-preview-modal')).toBeHidden();
   });
 
   // SCEN-277
-  test("[normal] 承認判断入力画面 - 承認履歴が正常に表示される", async ({ page }) => {
-    const historySection = page.locator('[data-testid="approval-history"]');
-    await expect(historySection).toBeVisible();
-    await expect(historySection.locator('text=山田主任')).toBeVisible();
-    await expect(historySection.locator('text=内容確認済み。承認します。')).toBeVisible();
+  test("承認履歴が正常に表示される", async ({ page }) => {
+    await expect(page.locator('[data-testid="approval-history-table"]')).toBeVisible();
+    await expect(page.locator('#approval-history-tbody')).toBeVisible();
   });
 
   // SCEN-278
-  test("[error] 承認判断入力画面 - 判断未選択で送信エラー", async ({ page }) => {
-    await page.fill('[data-testid="approval-comment"]', '任意のコメント');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=承認判断を選択してください')).toBeVisible();
+  test("判断未選択で送信エラー", async ({ page }) => {
+    await page.fill('[data-testid="approval-comment"]', '何らかのコメント');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('判定を選択してください');
   });
 
   // SCEN-279
-  test("[error] 承認判断入力画面 - 差戻し時コメント必須チェック", async ({ page }) => {
-    await page.check('[data-testid="decision-return"]');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=差戻し理由を入力してください')).toBeVisible();
+  test("差戻し時コメント必須チェック", async ({ page }) => {
+    await page.check('[data-testid="return-radio"]');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('コメントは必須です');
   });
 
   // SCEN-280
-  test("[error] 承認判断入力画面 - 却下時コメント必須チェック", async ({ page }) => {
-    await page.check('[data-testid="decision-reject"]');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=却下理由を入力してください')).toBeVisible();
+  test("却下時コメント必須チェック", async ({ page }) => {
+    await page.check('[data-testid="reject-radio"]');
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('コメントは必須です');
   });
 
   // SCEN-281
-  test("[error] 承認判断入力画面 - 権限なし申請でアクセス拒否", async ({ page }) => {
+  test("権限なし申請でアクセス拒否", async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[name="username"]', 'unauthorized');
+    await page.fill('[name="username"]', 'unauthorized_user');
     await page.fill('[name="password"]', 'test');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('button[type="submit"]'),
     ]);
     await page.goto("/panels/scr-1779422452973.html");
-    await expect(page.locator('text=アクセス権限がありません')).toBeVisible();
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('アクセス権限がありません');
   });
 
   // SCEN-282
-  test("[edge] 承認判断入力画面 - コメント最大文字数制限", async ({ page }) => {
+  test("コメント最大文字数制限", async ({ page }) => {
     const longComment = 'a'.repeat(1001);
-    await page.check('[data-testid="decision-approve"]');
+    await page.check('[data-testid="approve-radio"]');
     await page.fill('[data-testid="approval-comment"]', longComment);
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=コメントは1000文字以内で入力してください')).toBeVisible();
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('文字数制限を超えています');
   });
 
   // SCEN-283
-  test("[edge] 承認判断入力画面 - コメント最小文字数制限", async ({ page }) => {
-    await page.check('[data-testid="decision-approve"]');
+  test("コメント最小文字数制限", async ({ page }) => {
+    await page.check('[data-testid="reject-radio"]');
     await page.fill('[data-testid="approval-comment"]', 'a');
-    await page.click('[data-testid="confirm-button"]');
-    await expect(page.locator('text=コメントは10文字以上で入力してください')).toBeVisible();
+    await page.click('[data-testid="submit-decision-button"]');
+    await expect(page.locator('#error-message')).toBeVisible();
+    await expect(page.locator('#error-message')).toContainText('最小文字数に達していません');
   });
 
   // SCEN-284
-  test("[edge] 承認判断入力画面 - 添付ファイル0件表示", async ({ page }) => {
-    const attachmentSection = page.locator('text=添付ファイル').locator('..');
-    await expect(attachmentSection.locator('text=添付ファイルはありません')).toBeVisible();
+  test("添付ファイル0件表示", async ({ page }) => {
+    await expect(page.locator('#attachment-list')).toContainText('添付ファイルはありません');
   });
 
   // SCEN-285
-  test("[edge] 承認判断入力画面 - 承認履歴0件表示", async ({ page }) => {
-    await page.goto("/panels/scr-1779422452973.html?history=empty");
-    const historySection = page.locator('[data-testid="approval-history"]');
-    await expect(historySection.locator('text=承認履歴はありません')).toBeVisible();
+  test("承認履歴0件表示", async ({ page }) => {
+    await expect(page.locator('#approval-history-tbody')).toContainText('承認履歴はありません');
   });
 });

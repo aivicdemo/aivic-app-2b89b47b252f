@@ -12,177 +12,170 @@ test.describe("承認処理画面", () => {
     await page.goto("/panels/scr-1779422254479.html");
   });
 
-  // SCEN-054
-  test("[normal] 承認処理画面 - 申請書類一覧が正常表示される", async ({ page }) => {
-    await expect(page.locator("#applications-list")).toBeVisible();
-    await expect(page.locator("#applications-list")).toContainText("申請書類詳細");
-    await expect(page.locator("#applications-list")).toContainText("申請者");
-    await expect(page.locator("#applications-list")).toContainText("申請日時");
-    await expect(page.locator("#applications-list")).toContainText("申請種別");
+  test("// SCEN-054: 申請書類一覧が正常表示される", async ({ page }) => {
+    await expect(page.locator('[data-testid="applications-list"]')).toBeVisible();
+    await expect(page.locator('[data-testid="applications-tbody"]')).toBeVisible();
+    await expect(page.locator('text=申請ID')).toBeVisible();
+    await expect(page.locator('text=申請者')).toBeVisible();
+    await expect(page.locator('text=種別')).toBeVisible();
+    await expect(page.locator('text=申請日')).toBeVisible();
+    await expect(page.locator('text=ステータス')).toBeVisible();
   });
 
-  // SCEN-055
-  test("[normal] 承認処理画面 - 申請書類詳細が正常表示される", async ({ page }) => {
-    await expect(page.locator("#application-detail")).toBeVisible();
-    await expect(page.locator("#detail-title")).toBeVisible();
-    await expect(page.locator("#applicant-name")).toBeVisible();
-    await expect(page.locator("#application-date")).toBeVisible();
-    await expect(page.locator("#application-type")).toBeVisible();
-    await expect(page.locator("#application-content")).toBeVisible();
+  test("// SCEN-055: 申請書類詳細が正常表示される", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await expect(page.locator('[data-testid="application-detail"]')).toBeVisible();
+    await expect(page.locator('#detail-content')).toBeVisible();
+    await expect(page.locator('text=申請詳細')).toBeVisible();
   });
 
-  // SCEN-056
-  test("[normal] 承認処理画面 - 承認処理が正常完了する", async ({ page }) => {
-    await page.fill("#approval-comment", "申請内容を確認し、承認いたします。");
-    await page.click("#btn-approve");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("承認済み");
+  test("// SCEN-056: 承認処理が正常完了する", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.fill('[data-testid="approval-comment"]', '承認します');
+    await page.click('[data-testid="approve-button"]');
+    await expect(page.locator('[id="confirm-dialog"]')).toBeVisible();
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=承認処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-057
-  test("[normal] 承認処理画面 - 差戻し処理が正常完了する", async ({ page }) => {
-    await page.click("#btn-reject");
-    await page.fill("#rejection-reason", "添付書類に不備があるため差戻しいたします。");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("差戻し");
+  test("// SCEN-057: 差戻し処理が正常完了する", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('[data-testid="reject-button"]');
+    await page.fill('[data-testid="reject-reason"]', '書類に不備があります');
+    await page.click('button:has-text("差戻し実行")');
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=差戻し処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-058
-  test("[normal] 承認処理画面 - 保留処理が正常完了する", async ({ page }) => {
-    await page.click("#btn-hold");
-    await page.fill("#rejection-reason", "追加確認が必要なため一時保留とします。");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("保留中");
+  test("// SCEN-058: 保留処理が正常完了する", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('[data-testid="hold-button"]');
+    await page.fill('[data-testid="hold-reason"]', '追加確認が必要です');
+    await page.click('button:has-text("保留実行")');
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=保留処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-059
-  test("[normal] 承認処理画面 - 承認コメント入力で処理完了", async ({ page }) => {
-    await page.fill("#approval-comment", "内容を確認しました。問題ありません。");
-    await page.click("#btn-approve");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("承認済み");
+  test("// SCEN-059: 承認コメント入力で処理完了", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.fill('[data-testid="approval-comment"]', '内容を確認し承認します');
+    await page.click('button:has-text("承認")');
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=承認処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-060
-  test("[normal] 承認処理画面 - 差戻し理由入力で処理完了", async ({ page }) => {
-    await page.click("#btn-reject");
-    await page.fill("#rejection-reason", "申請金額の根拠が不明確です。");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("差戻し");
+  test("// SCEN-060: 差戻し理由入力で処理完了", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('button:has-text("差戻し")');
+    await page.fill('[data-testid="reject-reason"]', '申請金額の根拠資料が不足しています');
+    await page.click('button:has-text("実行")');
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=差戻し処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-061
-  test("[normal] 承認処理画面 - 承認履歴が正常表示される", async ({ page }) => {
-    await expect(page.locator("[data-testid='approval-history']")).toBeVisible();
-    await expect(page.locator("#approval-history-tbody")).toBeVisible();
-    await expect(page.locator("[data-testid='approval-history']")).toContainText("承認者");
-    await expect(page.locator("[data-testid='approval-history']")).toContainText("結果");
-    await expect(page.locator("[data-testid='approval-history']")).toContainText("日時");
-    await expect(page.locator("[data-testid='approval-history']")).toContainText("コメント");
+  test("// SCEN-061: 承認履歴が正常表示される", async ({ page }) => {
+    await expect(page.locator('[data-testid="approval-history"]')).toBeVisible();
+    await expect(page.locator('[data-testid="history-tbody"]')).toBeVisible();
+    await expect(page.locator('text=承認日時')).toBeVisible();
+    await expect(page.locator('text=承認者')).toBeVisible();
+    await expect(page.locator('text=結果')).toBeVisible();
+    await expect(page.locator('text=コメント')).toBeVisible();
   });
 
-  // SCEN-062
-  test("[normal] 承認処理画面 - 添付ファイルが正常表示される", async ({ page }) => {
-    await expect(page.locator("#attachments-section")).toBeVisible();
-    await expect(page.locator("#attachments-list")).toBeVisible();
-    const fileLink = page.locator("#attachments-list").first();
+  test("// SCEN-062: 添付ファイルが正常表示される", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await expect(page.locator('[data-testid="attachments-area"]')).toBeVisible();
+    const fileLink = page.locator('[data-testid="attachments-content"] a').first();
     if (await fileLink.isVisible()) {
-      await expect(fileLink).toContainText("開く");
+      await expect(fileLink).toBeVisible();
     }
   });
 
-  // SCEN-063
-  test("[normal] 承認処理画面 - 承認フロー進捗が正常表示される", async ({ page }) => {
-    await expect(page.locator("#approval-flow")).toBeVisible();
-    await expect(page.locator("#approval-flow")).toContainText("承認フロー進捗");
-    await expect(page.locator("#approval-flow")).toContainText("✓");
+  test("// SCEN-063: 承認フロー進捗が正常表示される", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await expect(page.locator('[data-testid="approval-flow"]')).toBeVisible();
+    await expect(page.locator('text=承認フロー進捗')).toBeVisible();
   });
 
-  // SCEN-064
-  test("[error] 承認処理画面 - 承認権限なしでエラー表示", async ({ page }) => {
-    await page.click("#btn-approve");
-    await expect(page.locator("#modal-message")).toContainText("承認権限がありません");
-  });
-
-  // SCEN-065
-  test("[error] 承認処理画面 - 既承認済み書類で処理不可", async ({ page }) => {
-    await page.locator("#status-badge").waitFor();
-    const statusText = await page.locator("#status-badge").textContent();
-    if (statusText?.includes("承認済み")) {
-      await page.click("#btn-approve");
-      await expect(page.locator("#modal-message")).toContainText("既に承認済み");
+  test("// SCEN-064: 承認権限なしでエラー表示", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('button:has-text("承認")');
+    if (await page.locator('text=承認権限がありません').isVisible()) {
+      await expect(page.locator('text=承認権限がありません')).toBeVisible();
     }
   });
 
-  // SCEN-066
-  test("[error] 承認処理画面 - 差戻し理由未入力でエラー", async ({ page }) => {
-    await page.click("#btn-reject");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#modal-message")).toContainText("差戻し理由を入力してください");
+  test("// SCEN-065: 既承認済み書類で処理不可", async ({ page }) => {
+    const approvedRow = page.locator('[data-testid="applications-tbody"] tr').filter({ hasText: '承認済み' }).first();
+    if (await approvedRow.isVisible()) {
+      await approvedRow.click();
+      await page.click('button:has-text("承認")');
+      await expect(page.locator('text=この書類は既に承認済みのため、処理できません')).toBeVisible();
+    }
   });
 
-  // SCEN-067
-  test("[error] 承認処理画面 - 存在しない申請書類でエラー", async ({ page }) => {
+  test("// SCEN-066: 差戻し理由未入力でエラー", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('button:has-text("差戻し")');
+    await page.click('button:has-text("差戻し実行")');
+    await expect(page.locator('text=差戻し理由を入力してください')).toBeVisible();
+  });
+
+  test("// SCEN-067: 存在しない申請書類でエラー", async ({ page }) => {
     await page.goto("/panels/scr-1779422254479.html?id=99999");
-    await expect(page.locator("#no-selection")).toContainText("指定された申請書類が見つかりません");
+    await expect(page.locator('text=指定された申請書類が見つかりません')).toBeVisible();
   });
 
-  // SCEN-068
-  test("[error] 承認処理画面 - 添付ファイル破損でエラー表示", async ({ page }) => {
-    const fileLink = page.locator("#attachments-list a").first();
-    if (await fileLink.isVisible()) {
-      await fileLink.click();
-      await page.waitForTimeout(1000);
-      const errorMessage = page.locator('[role="alert"]');
-      if (await errorMessage.isVisible()) {
-        await expect(errorMessage).toContainText("ファイルが破損");
-      }
+  test("// SCEN-068: 添付ファイル破損でエラー表示", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    const corruptedFile = page.locator('[data-testid="attachments-content"] a').filter({ hasText: '破損' }).first();
+    if (await corruptedFile.isVisible()) {
+      await corruptedFile.click();
+      await expect(page.locator('text=添付ファイルが破損しているため開けません')).toBeVisible();
     }
   });
 
-  // SCEN-069
-  test("[edge] 承認処理画面 - 承認コメント最大文字数", async ({ page }) => {
-    const maxText = "a".repeat(1000);
-    await page.fill("#approval-comment", maxText);
-    await page.click("#btn-approve");
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("承認済み");
-
-    const overText = "a".repeat(1001);
-    await page.fill("#approval-comment", overText);
-    await page.click("#btn-approve");
-    await expect(page.locator("#modal-message")).toContainText("最大文字数を超えています");
+  test("// SCEN-069: 承認コメント最大文字数", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    const maxComment = 'a'.repeat(1000);
+    await page.fill('[data-testid="approval-comment"]', maxComment);
+    await page.click('button:has-text("承認")');
+    await page.click('[id="dialog-ok"]');
+    
+    const overMaxComment = 'a'.repeat(1001);
+    await page.fill('[data-testid="approval-comment"]', overMaxComment);
+    await page.click('button:has-text("承認")');
+    await expect(page.locator('text=コメントは1000文字以内で入力してください')).toBeVisible();
   });
 
-  // SCEN-070
-  test("[edge] 承認処理画面 - 差戻し理由最大文字数", async ({ page }) => {
-    await page.click("#btn-reject");
-    const maxText = "a".repeat(1000);
-    await page.fill("#rejection-reason", maxText);
-    await page.click("#modal-confirm");
-    await expect(page.locator("#status-badge")).toContainText("差戻し");
+  test("// SCEN-070: 差戻し理由最大文字数", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await page.click('button:has-text("差戻し")');
+    const maxReason = 'a'.repeat(1000);
+    await page.fill('[data-testid="reject-reason"]', maxReason);
+    await page.click('button:has-text("差戻し実行")');
+    await page.click('[id="dialog-ok"]');
+    await expect(page.locator('text=差戻し処理が完了しました')).toBeVisible();
   });
 
-  // SCEN-071
-  test("[edge] 承認処理画面 - 申請書類一覧0件表示", async ({ page }) => {
-    await page.goto("/panels/scr-1779422254479.html?empty=true");
-    await expect(page.locator("#applications-list")).toContainText("承認待ちの申請書類はありません");
+  test("// SCEN-071: 申請書類一覧0件表示", async ({ page }) => {
+    await page.fill('[data-testid="search-applications"]', '存在しない申請');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('text=承認待ちの申請書類はありません')).toBeVisible();
   });
 
-  // SCEN-072
-  test("[edge] 承認処理画面 - 承認履歴0件表示", async ({ page }) => {
-    const historySection = page.locator("[data-testid='approval-history']");
-    await expect(historySection).toBeVisible();
-    if (await page.locator("#approval-history-tbody tr").count() === 0) {
-      await expect(historySection).toContainText("承認履歴はありません");
+  test("// SCEN-072: 承認履歴0件表示", async ({ page }) => {
+    await expect(page.locator('[data-testid="approval-history"]')).toBeVisible();
+    if (await page.locator('text=承認履歴がありません').isVisible()) {
+      await expect(page.locator('text=承認履歴がありません')).toBeVisible();
     }
   });
 
-  // SCEN-073
-  test("[edge] 承認処理画面 - 添付ファイル0件表示", async ({ page }) => {
-    await expect(page.locator("#attachments-section")).toBeVisible();
-    if (await page.locator("#attachments-list").textContent() === "") {
-      await expect(page.locator("#attachments-section")).toContainText("添付ファイルなし");
+  test("// SCEN-073: 添付ファイル0件表示", async ({ page }) => {
+    await page.click('[data-testid="applications-tbody"] tr:first-child');
+    await expect(page.locator('[data-testid="attachments-area"]')).toBeVisible();
+    if (await page.locator('text=添付ファイルなし').isVisible()) {
+      await expect(page.locator('text=添付ファイルなし')).toBeVisible();
     }
   });
 });

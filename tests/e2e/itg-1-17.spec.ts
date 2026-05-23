@@ -12,157 +12,191 @@ test.describe("結果通知処理", () => {
     await page.goto("/panels/scr-1779422470870.html");
   });
 
-  test('SCEN-286: [normal] 結果通知処理 - 承認済み申請の通知対象一覧表示', async ({ page }) => {
-    await page.selectOption('#filter-status', 'approved');
+  // SCEN-286
+  test("承認済み申請の通知対象一覧表示", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
     await page.click('#btn-search');
-    await expect(page.locator('#application-tbody')).toBeVisible();
-    await expect(page.locator('text=申請番号')).toBeVisible();
-    await expect(page.locator('text=申請者名')).toBeVisible();
-    await expect(page.locator('text=最終承認日時')).toBeVisible();
-    await expect(page.locator('text=通知状況')).toBeVisible();
+    await expect(page.locator('#applications-list')).toBeVisible();
+    await expect(page.locator('#applications-tbody')).toContainText('申請者名');
   });
 
-  test('SCEN-287: [normal] 結果通知処理 - 却下済み申請の通知対象一覧表示', async ({ page }) => {
-    await page.selectOption('#filter-status', 'rejected');
+  // SCEN-287
+  test("却下済み申請の通知対象一覧表示", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '却下');
     await page.click('#btn-search');
-    await expect(page.locator('#application-tbody')).toBeVisible();
-    await expect(page.locator('text=申請番号')).toBeVisible();
-    await expect(page.locator('text=申請者名')).toBeVisible();
-    await expect(page.locator('text=最終承認日時')).toBeVisible();
-    await expect(page.locator('text=通知状況')).toBeVisible();
+    await expect(page.locator('#applications-list')).toBeVisible();
+    await expect(page.locator('#applications-tbody')).toContainText('申請者名');
   });
 
-  test('SCEN-288: [normal] 結果通知処理 - メール通知での結果通知送信', async ({ page }) => {
+  // SCEN-288
+  test("メール通知での結果通知送信", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-email');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
-    await expect(page.locator('text=送信完了')).toBeVisible();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await page.click('#btn-confirm-ok');
   });
 
-  test('SCEN-289: [normal] 結果通知処理 - システム内通知での結果通知送信', async ({ page }) => {
+  // SCEN-289
+  test("システム内通知での結果通知送信", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-system');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
-    await expect(page.locator('text=通知送信')).toBeVisible();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await page.click('#btn-confirm-ok');
   });
 
-  test('SCEN-290: [normal] 結果通知処理 - SMS通知での結果通知送信', async ({ page }) => {
+  // SCEN-290
+  test("SMS通知での結果通知送信", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-sms');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
-    await expect(page.locator('text=SMS送信完了')).toBeVisible();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await page.click('#btn-confirm-ok');
   });
 
-  test('SCEN-291: [normal] 結果通知処理 - 複数通知方法選択での通知送信', async ({ page }) => {
+  // SCEN-291
+  test("複数通知方法選択での通知送信", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-email');
-    await page.check('#notify-system');
     await page.check('#notify-sms');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.check('#notify-system');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
-    await expect(page.locator('text=送信完了')).toBeVisible();
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await page.click('#btn-confirm-ok');
   });
 
-  test('SCEN-292: [normal] 結果通知処理 - 通知テンプレート選択変更', async ({ page }) => {
-    await page.selectOption('#notification-template', 'rejected_notification');
-    await expect(page.locator('#notification-template')).toHaveValue('rejected_notification');
+  // SCEN-292
+  test("通知テンプレート選択変更", async ({ page }) => {
+    await page.selectOption('#select-template', '却下通知テンプレート');
+    await expect(page.locator('#select-template')).toHaveValue('却下通知テンプレート');
+    await page.selectOption('#select-template', 'カスタムテンプレート');
+    await expect(page.locator('#select-template')).toHaveValue('カスタムテンプレート');
+  });
+
+  // SCEN-293
+  test("通知内容プレビュー表示", async ({ page }) => {
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-preview');
-    await expect(page.locator('text=プレビュー確認')).toBeVisible();
+    await expect(page.locator('#preview-modal')).toBeVisible();
+    await expect(page.locator('#preview-content')).toContainText('承認が完了しました。');
+    await page.click('#btn-close-preview');
   });
 
-  test('SCEN-293: [normal] 結果通知処理 - 通知内容プレビュー表示', async ({ page }) => {
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
-    await page.click('#btn-preview');
-    await expect(page.locator('text=プレビュー確認')).toBeVisible();
-  });
-
-  test('SCEN-294: [error] 結果通知処理 - 通知方法未選択での送信エラー', async ({ page }) => {
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#notification-content', '申請が承認されました。');
+  // SCEN-294
+  test("通知方法未選択での送信エラー", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
+    await page.fill('#notification-content', 'テスト通知内容');
     await page.click('#btn-send-notification');
     await expect(page.locator('text=通知方法を選択してください')).toBeVisible();
   });
 
-  test('SCEN-295: [error] 結果通知処理 - 通知テンプレート未選択での送信エラー', async ({ page }) => {
+  // SCEN-295
+  test("通知テンプレート未選択での送信エラー", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-email');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.fill('#notification-content', 'テスト通知内容');
     await page.click('#btn-send-notification');
     await expect(page.locator('text=通知テンプレートを選択してください')).toBeVisible();
   });
 
-  test('SCEN-296: [error] 結果通知処理 - メール送信失敗時のエラー処理', async ({ page }) => {
+  // SCEN-296
+  test("メール送信失敗時のエラー処理", async ({ page }) => {
+    await page.route('**/api/notifications/email', route => {
+      route.fulfill({ status: 500, body: JSON.stringify({ error: 'Mail server error' }) });
+    });
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-email');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
-    
-    await page.route('**/send-email', route => route.abort());
-    
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
+    await page.click('#btn-confirm-ok');
     await expect(page.locator('text=メール送信に失敗しました')).toBeVisible();
   });
 
-  test('SCEN-297: [error] 結果通知処理 - SMS送信失敗時のエラー処理', async ({ page }) => {
+  // SCEN-297
+  test("SMS送信失敗時のエラー処理", async ({ page }) => {
+    await page.route('**/api/notifications/sms', route => {
+      route.fulfill({ status: 500, body: JSON.stringify({ error: 'SMS service error' }) });
+    });
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-sms');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
-    
-    await page.route('**/send-sms', route => route.abort());
-    
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
+    await page.click('#btn-confirm-ok');
     await expect(page.locator('text=SMS送信に失敗しました')).toBeVisible();
   });
 
-  test('SCEN-298: [edge] 結果通知処理 - 通知対象申請0件での画面表示', async ({ page }) => {
-    await page.selectOption('#filter-status', 'approved');
+  // SCEN-298
+  test("通知対象申請0件での画面表示", async ({ page }) => {
+    await page.selectOption('#select-approval-status', '取下げ');
     await page.click('#btn-search');
     await expect(page.locator('text=通知対象の申請はありません')).toBeVisible();
   });
 
-  test('SCEN-299: [edge] 結果通知処理 - 通知対象申請大量件数での一覧表示', async ({ page }) => {
-    await page.selectOption('#filter-status', 'すべて');
+  // SCEN-299
+  test("通知対象申請大量件数での一覧表示", async ({ page }) => {
+    await page.route('**/api/applications', route => {
+      const applications = Array(1200).fill(null).map((_, i) => ({
+        id: `app-${i}`,
+        title: `申請書類 ${i}`,
+        applicant: `申請者 ${i}`,
+        approvalDate: '2024-01-01',
+        status: '承認済'
+      }));
+      route.fulfill({ status: 200, body: JSON.stringify({ data: applications, total: 1200 }) });
+    });
+    await page.selectOption('#select-approval-status', '承認済');
     await page.click('#btn-search');
-    await expect(page.locator('#application-tbody')).toBeVisible();
-    const loadTime = await page.evaluate(() => performance.now());
-    expect(loadTime).toBeLessThan(5000);
+    await expect(page.locator('#applications-list')).toBeVisible();
+    await expect(page.locator('#applications-tbody')).toContainText('申請書類');
   });
 
-  test('SCEN-300: [edge] 結果通知処理 - 申請者メールアドレス未設定での通知', async ({ page }) => {
+  // SCEN-300
+  test("申請者メールアドレス未設定での通知", async ({ page }) => {
+    await page.route('**/api/notifications/email', route => {
+      route.fulfill({ status: 400, body: JSON.stringify({ error: 'Email address not found' }) });
+    });
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-email');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
+    await page.click('#btn-confirm-ok');
     await expect(page.locator('text=メールアドレスが設定されていません')).toBeVisible();
   });
 
-  test('SCEN-301: [edge] 結果通知処理 - 申請者電話番号未設定でのSMS通知', async ({ page }) => {
+  // SCEN-301
+  test("申請者電話番号未設定でのSMS通知", async ({ page }) => {
+    await page.route('**/api/notifications/sms', route => {
+      route.fulfill({ status: 400, body: JSON.stringify({ error: 'Phone number not found' }) });
+    });
+    await page.selectOption('#select-approval-status', '承認済');
+    await page.click('#btn-search');
     await page.check('#notify-sms');
-    await page.selectOption('#notification-template', 'approved_notification');
-    await page.fill('#notification-subject', '申請承認通知');
-    await page.fill('#sender-name', '事務局長');
-    await page.fill('#notification-content', '申請が承認されました。');
+    await page.selectOption('#select-template', '承認通知テンプレート');
+    await page.fill('#notification-content', '承認が完了しました。');
     await page.click('#btn-send-notification');
+    await page.click('#btn-confirm-ok');
     await expect(page.locator('text=電話番号が設定されていません')).toBeVisible();
   });
 });

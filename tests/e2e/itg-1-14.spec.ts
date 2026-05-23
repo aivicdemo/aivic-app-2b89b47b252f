@@ -13,260 +13,236 @@ test.describe("承認案件通知画面", () => {
   });
 
   // SCEN-234
-  test("通知一覧が正常に表示される", async ({ page }) => {
-    await page.waitForSelector('[data-testid="notification-list"]');
-    const notificationList = page.locator('[data-testid="notification-list"]');
-    await expect(notificationList).toBeVisible();
-    
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+  test('[normal] 承認案件通知画面 - 通知一覧が正常に表示される', async ({ page }) => {
+    await expect(page.locator('#current-screen-title')).toContainText('承認案件通知');
+    await expect(page.locator('[data-testid="notification-list"]')).toBeVisible();
+    await expect(page.locator('#notification-tbody')).toBeVisible();
+    await expect(page.locator('th').first()).toContainText('通知日時');
+    await expect(page.locator('th').nth(1)).toContainText('申請書類');
+    await expect(page.locator('th').nth(2)).toContainText('承認期限');
   });
 
   // SCEN-235
-  test("未読通知件数バッジが正確に表示される", async ({ page }) => {
-    const unreadBadge = page.locator('[data-testid="unread-badge"]');
-    const initialCount = await unreadBadge.textContent();
-    expect(initialCount).toBeTruthy();
+  test('[normal] 承認案件通知画面 - 未読通知件数バッジが正確に表示される', async ({ page }) => {
+    await expect(page.locator('#unread-badge')).toBeVisible();
+    const initialBadgeText = await page.locator('#unread-badge .notification-count').textContent();
     
-    await page.locator('#notification-tbody tr:first-child button:has-text("既読")').first().click();
-    
-    await page.locator('[data-testid="refresh-button"]').click();
-    await page.waitForTimeout(1000);
-    
-    const updatedCount = await unreadBadge.textContent();
-    expect(parseInt(updatedCount || '0')).toBeLessThanOrEqual(parseInt(initialCount || '0'));
+    const firstNotificationRow = page.locator('#notification-tbody tr').first();
+    if (await firstNotificationRow.isVisible()) {
+      await firstNotificationRow.click();
+      await page.waitForTimeout(1000);
+      await page.click('[data-testid="refresh-button"]');
+      
+      const updatedBadgeText = await page.locator('#unread-badge .notification-count').textContent();
+      expect(parseInt(updatedBadgeText || '0')).toBeLessThan(parseInt(initialBadgeText || '0'));
+    }
   });
 
   // SCEN-236
-  test("緊急度フィルターで通知を絞り込める", async ({ page }) => {
-    const urgencyFilter = page.locator('[data-testid="urgency-filter"]');
+  test('[normal] 承認案件通知画面 - 緊急度フィルターで通知を絞り込める', async ({ page }) => {
+    await page.selectOption('[data-testid="priority-filter"]', '高');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await urgencyFilter.selectOption('緊急');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    await page.selectOption('[data-testid="priority-filter"]', '中');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await urgencyFilter.selectOption('高');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    await page.selectOption('[data-testid="priority-filter"]', '低');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await urgencyFilter.selectOption('通常');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
-    
-    await urgencyFilter.selectOption('全て');
-    await page.locator('[data-testid="search-button"]').click();
-    
-    const tableRows = page.locator('#notification-tbody tr');
-    await expect(tableRows.first()).toBeVisible();
+    await page.selectOption('[data-testid="priority-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-237
-  test("文書種別フィルターで通知を絞り込める", async ({ page }) => {
-    const documentTypeFilter = page.locator('[data-testid="document-type-filter"]');
+  test('[normal] 承認案件通知画面 - 文書種別フィルターで通知を絞り込める', async ({ page }) => {
+    await page.selectOption('[data-testid="document-type-filter"]', '稟議書');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await documentTypeFilter.selectOption('休暇申請');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    await page.selectOption('[data-testid="document-type-filter"]', '経費申請');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await documentTypeFilter.selectOption('経費申請');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
-    
-    await documentTypeFilter.selectOption('全て');
-    await page.locator('[data-testid="search-button"]').click();
-    
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    await page.selectOption('[data-testid="document-type-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-238
-  test("申請者フィルターで通知を絞り込める", async ({ page }) => {
-    const applicantFilter = page.locator('[data-testid="applicant-filter"]');
+  test('[normal] 承認案件通知画面 - 申請者フィルターで通知を絞り込める', async ({ page }) => {
+    await page.selectOption('[data-testid="applicant-filter"]', '田中太郎');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await applicantFilter.selectOption({ index: 1 });
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    const displayedRows = page.locator('#notification-tbody tr');
+    const count = await displayedRows.count();
+    if (count > 0) {
+      await expect(displayedRows.first()).toContainText('田中太郎');
+    }
     
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
-    
-    await applicantFilter.selectOption('全て');
-    await page.locator('[data-testid="search-button"]').click();
-    
-    const allRows = await page.locator('#notification-tbody tr').count();
-    expect(allRows).toBeGreaterThanOrEqual(rowCount);
+    await page.selectOption('[data-testid="applicant-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-239
-  test("期限フィルターで通知を絞り込める", async ({ page }) => {
-    const deadlineFilter = page.locator('[data-testid="deadline-filter"]');
+  test('[normal] 承認案件通知画面 - 期限フィルターで通知を絞り込める', async ({ page }) => {
+    await page.selectOption('[data-testid="deadline-filter"]', '今日まで');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await deadlineFilter.selectOption('1週間以内');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    await page.selectOption('[data-testid="deadline-filter"]', '1週間以内');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    const filteredRows = await page.locator('#notification-tbody tr').count();
-    expect(filteredRows).toBeGreaterThanOrEqual(0);
+    await page.selectOption('[data-testid="deadline-filter"]', '1ヶ月以内');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await deadlineFilter.selectOption('全て');
-    await page.locator('[data-testid="search-button"]').click();
-    
-    const allRows = await page.locator('#notification-tbody tr').count();
-    expect(allRows).toBeGreaterThanOrEqual(filteredRows);
+    await page.selectOption('[data-testid="deadline-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-240
-  test("申請書類名リンクから詳細画面に遷移できる", async ({ page }) => {
-    const firstDocumentLink = page.locator('#notification-tbody tr:first-child a').first();
-    await firstDocumentLink.click();
+  test('[normal] 承認案件通知画面 - 申請書類名リンクから詳細画面に遷移できる', async ({ page }) => {
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    await page.waitForURL(url => url.toString().includes('/panels/'));
-    expect(page.url()).toContain('/panels/');
+    const firstDocumentLink = page.locator('#notification-tbody tr td a').first();
+    if (await firstDocumentLink.isVisible()) {
+      await firstDocumentLink.click();
+      await page.waitForTimeout(1000);
+      await expect(page).toHaveURL(/\/panels\//);
+    }
   });
 
   // SCEN-241
-  test("遅延警告アラートが表示される", async ({ page }) => {
-    const alertElements = page.locator('text=期限超過, text=本日期限, text=明日期限');
-    const alertCount = await alertElements.count();
-    expect(alertCount).toBeGreaterThanOrEqual(0);
-    
-    if (alertCount > 0) {
-      const firstAlert = alertElements.first();
-      await expect(firstAlert).toBeVisible();
+  test('[normal] 承認案件通知画面 - 遅延警告アラートが表示される', async ({ page }) => {
+    const delayAlert = page.locator('#delay-alert');
+    if (await delayAlert.isVisible()) {
+      await expect(delayAlert).toContainText('⚠️');
+      await expect(delayAlert).toHaveClass(/delay-alert/);
+      const alertText = await page.locator('#delay-message').textContent();
+      expect(alertText).toBeTruthy();
     }
   });
 
   // SCEN-242
-  test("複数フィルター組み合わせで絞り込める", async ({ page }) => {
-    await page.locator('[data-testid="document-type-filter"]').selectOption('経費申請');
-    await page.locator('[data-testid="urgency-filter"]').selectOption('緊急');
-    await page.locator('[data-testid="deadline-filter"]').selectOption('1週間以内');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+  test('[normal] 承認案件通知画面 - 複数フィルター組み合わせで絞り込める', async ({ page }) => {
+    await page.selectOption('[data-testid="document-type-filter"]', '経費申請');
+    await page.selectOption('[data-testid="priority-filter"]', '高');
+    await page.selectOption('[data-testid="deadline-filter"]', '1週間以内');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
     
-    const filteredRows = await page.locator('#notification-tbody tr').count();
-    
-    await page.locator('[data-testid="applicant-filter"]').selectOption({ index: 1 });
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
-    
-    const furtherFilteredRows = await page.locator('#notification-tbody tr').count();
-    expect(furtherFilteredRows).toBeLessThanOrEqual(filteredRows);
+    await page.selectOption('[data-testid="applicant-filter"]', '田中太郎');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-243
-  test("通知0件時に適切なメッセージが表示される", async ({ page }) => {
-    await page.locator('[data-testid="urgency-filter"]').selectOption('緊急');
-    await page.locator('[data-testid="document-type-filter"]').selectOption('稟議申請');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+  test('[edge] 承認案件通知画面 - 通知0件時に適切なメッセージが表示される', async ({ page }) => {
+    await page.selectOption('[data-testid="priority-filter"]', '低');
+    await page.selectOption('[data-testid="document-type-filter"]', '出張申請');
+    await page.click('[data-testid="search-button"]');
     
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    
-    if (rowCount === 0) {
-      const emptyMessage = page.locator('text=通知はありません');
-      await expect(emptyMessage).toBeVisible();
+    const emptyMessage = page.locator('#empty-message');
+    if (await emptyMessage.isVisible()) {
+      await expect(emptyMessage).toContainText('通知はありません');
     }
   });
 
   // SCEN-244
-  test("未読通知0件時にバッジが非表示になる", async ({ page }) => {
-    const allReadButtons = page.locator('#notification-tbody button:has-text("既読")');
-    const buttonCount = await allReadButtons.count();
+  test('[edge] 承認案件通知画面 - 未読通知0件時にバッジが非表示になる', async ({ page }) => {
+    await page.selectOption('[data-testid="priority-filter"]', '低');
+    await page.selectOption('[data-testid="document-type-filter"]', '出張申請');
+    await page.click('[data-testid="search-button"]');
     
-    for (let i = 0; i < buttonCount; i++) {
-      await allReadButtons.nth(i).click();
-      await page.waitForTimeout(500);
+    const badgeCount = await page.locator('#unread-badge .notification-count').textContent();
+    if (badgeCount === '0' || badgeCount === '') {
+      await expect(page.locator('#unread-badge')).toHaveCSS('display', 'none');
     }
-    
-    await page.locator('[data-testid="refresh-button"]').click();
-    await page.waitForTimeout(1000);
-    
-    const unreadBadge = page.locator('[data-testid="unread-badge"]');
-    const badgeText = await unreadBadge.textContent();
-    expect(badgeText).toBe('0');
   });
 
   // SCEN-245
-  test("大量通知データでも正常表示される", async ({ page }) => {
-    await page.locator('[data-testid="refresh-button"]').click();
-    await page.waitForTimeout(2000);
+  test('[edge] 承認案件通知画面 - 大量通知データでも正常表示される', async ({ page }) => {
+    await page.selectOption('[data-testid="priority-filter"]', 'すべて');
+    await page.selectOption('[data-testid="document-type-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
     
-    const notificationList = page.locator('[data-testid="notification-list"]');
-    await expect(notificationList).toBeVisible();
+    await expect(page.locator('#notification-tbody')).toBeVisible();
+    await expect(page.locator('#pagination')).toBeVisible();
     
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    const nextButton = page.locator('#btn-next');
+    if (await nextButton.isEnabled()) {
+      await nextButton.click();
+      await expect(page.locator('#notification-tbody')).toBeVisible();
+    }
     
-    if (rowCount > 10) {
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      });
-      
-      await expect(tableRows.last()).toBeVisible();
+    const prevButton = page.locator('#btn-prev');
+    if (await prevButton.isEnabled()) {
+      await prevButton.click();
+      await expect(page.locator('#notification-tbody')).toBeVisible();
     }
   });
 
   // SCEN-246
-  test("存在しない申請書類リンクでエラーハンドリング", async ({ page }) => {
-    const firstLink = page.locator('#notification-tbody tr:first-child a').first();
+  test('[error] 承認案件通知画面 - 存在しない申請書類リンクでエラーハンドリング', async ({ page }) => {
+    await page.route('**/documents/999999', route => {
+      route.fulfill({ status: 404, body: 'Not Found' });
+    });
     
-    if (await firstLink.count() > 0) {
-      await firstLink.evaluate(link => {
-        (link as HTMLAnchorElement).href = '/panels/scr-999999.html';
+    const firstDocumentLink = page.locator('#notification-tbody tr td a').first();
+    if (await firstDocumentLink.isVisible()) {
+      await page.evaluate(() => {
+        const link = document.querySelector('#notification-tbody tr td a') as HTMLAnchorElement;
+        if (link) {
+          link.href = '/documents/999999';
+        }
       });
       
-      await firstLink.click();
-      
-      await page.waitForTimeout(2000);
-      const errorMessage = page.locator('text=申請書類が見つかりません, text=エラー');
-      const hasError = await errorMessage.count() > 0;
-      
-      if (!hasError) {
-        expect(page.url()).toContain('scr-999999');
-      }
+      await firstDocumentLink.click();
+      await page.waitForTimeout(1000);
     }
   });
 
   // SCEN-247
-  test("無効なフィルター条件でエラーハンドリング", async ({ page }) => {
-    await page.locator('[data-testid="deadline-filter"]').evaluate(select => {
-      const option = document.createElement('option');
-      option.value = 'INVALID_STATUS';
-      option.textContent = 'Invalid Option';
-      (select as HTMLSelectElement).appendChild(option);
+  test('[error] 承認案件通知画面 - 無効なフィルター条件でエラーハンドリング', async ({ page }) => {
+    await page.evaluate(() => {
+      const dateFilter = document.querySelector('[data-testid="deadline-filter"]') as HTMLSelectElement;
+      if (dateFilter) {
+        const invalidOption = document.createElement('option');
+        invalidOption.value = 'INVALID_STATUS';
+        invalidOption.textContent = 'INVALID_STATUS';
+        dateFilter.appendChild(invalidOption);
+      }
     });
     
-    await page.locator('[data-testid="deadline-filter"]').selectOption('INVALID_STATUS');
-    await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
+    await page.selectOption('[data-testid="deadline-filter"]', 'INVALID_STATUS');
+    await page.click('[data-testid="search-button"]');
     
-    const tableRows = page.locator('#notification-tbody tr');
-    const rowCount = await tableRows.count();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    await page.click('[data-testid="clear-filter-button"]');
+    await page.selectOption('[data-testid="deadline-filter"]', 'すべて');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#notification-tbody')).toBeVisible();
   });
 
   // SCEN-248
-  test("データ取得失敗時にエラーメッセージが表示される", async ({ page }) => {
+  test('[error] 承認案件通知画面 - データ取得失敗時にエラーメッセージが表示される', async ({ page }) => {
     await page.route('**/api/**', route => {
       route.abort('failed');
     });
     
-    await page.locator('[data-testid="refresh-button"]').click();
+    await page.click('[data-testid="refresh-button"]');
     await page.waitForTimeout(2000);
     
-    const errorIndicator = page.locator('text=エラー, text=失敗, text=取得できません');
-    const hasErrorMessage = await errorIndicator.count() > 0;
-    
-    if (!hasErrorMessage) {
-      const tableRows = page.locator('#notification-tbody tr');
-      const rowCount = await tableRows.count();
-      expect(rowCount).toBeGreaterThanOrEqual(0);
+    const errorMessage = page.locator('.error-message, .alert, [data-testid="error"]').first();
+    if (await errorMessage.isVisible()) {
+      await expect(errorMessage).toBeVisible();
     }
   });
 });

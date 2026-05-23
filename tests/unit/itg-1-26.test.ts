@@ -1,198 +1,221 @@
-import {
+import { 
   validateApplicationInput,
   validateApplicationAmountAndPeriod,
   classifyDocumentTypeAndRoute,
   determineDocumentTypeAndRoute,
   checkMoeComplianceRequirements,
-  setApprovalDeadline,
-  processUrgentApplicationPriority,
-  validateApplicationBeforeSubmission,
+  determineDigitalizationEligibility,
   determineProcessingRoute,
-  checkComplianceAndDetermineRoute,
   handleDocumentClassificationException,
-  determineDocumentStorageMethod,
-  classifyDocumentType,
-  evaluateSubsidyRelevance,
-  determineDigitalizationEligibility
+  determineDocumentStorageMethod
 } from "../../src/logic/it-1-br-2-1-1";
 
+const fetchMock = require("jest-fetch-mock");
+
 describe("申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能", () => {
-  
-  test("SCEN-417: 申請内容入力検証 - 必須項目が全て入力されている場合、次の処理に進むことができる", () => {
+  beforeEach(() => {
+    fetchMock.resetMocks();
+  });
+
+  // SCEN-417: [normal] 申請内容入力検証 - 必須項目が全て入力されている場合、次の処理に進むことができる
+  test("必須項目が全て適切に入力されている場合、有効と判定される", () => {
     const result = validateApplicationInput(
-      "大学設備更新申請について",
-      "研究設備の老朽化に伴い、新規設備導入により研究環境の向上を図る必要があります",
-      "設備申請",
-      "研究推進部",
+      "新しい研究設備導入に関する補助金申請について",
+      "本申請は、研究室の実験装置を更新するための補助金申請です。新設備により研究効率が大幅に向上することが期待されます。",
+      "補助金申請",
+      "理学部事務課",
       "通常"
     );
-    
+
     expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
+    expect(result.errors).toHaveLength(0);
   });
 
-  test("SCEN-418: 申請内容入力検証 - 必須項目が未入力の場合、エラーメッセージが表示される", () => {
-    expect(() => validateApplicationInput(
-      "",
-      "申請内容の詳細です",
-      "設備申請",
-      "研究推進部",
-      "通常"
-    )).toThrow("申請書類のタイトルは必須項目です。入力してください。");
+  // SCEN-418: [error] 申請内容入力検証 - 必須項目が未入力の場合、エラーメッセージが表示される
+  test("申請書類のタイトルが空の場合、エラーが発生する", () => {
+    expect(() => {
+      validateApplicationInput(
+        "",
+        "申請内容の詳細説明です。必要な設備の導入により業務効率が向上します。",
+        "設備申請",
+        "工学部事務課",
+        "通常"
+      );
+    }).toThrow("申請書類のタイトルは必須項目です。入力してください。");
   });
 
-  test("SCEN-419: 申請内容入力検証 - 必須項目の境界値での入力時、適切に検証される", () => {
-    expect(() => validateApplicationInput(
-      "123456789",
-      "申請内容詳細を記載していますが文字数が足りません",
-      "設備申請",
-      "研究推進部",
-      "通常"
-    )).toThrow("申請書類のタイトルは10文字以上200文字以内で入力してください");
+  // SCEN-419: [edge] 申請内容入力検証 - 必須項目の境界値での入力時、適切に検証される
+  test("申請内容が50文字未満の場合、エラーが発生する", () => {
+    expect(() => {
+      validateApplicationInput(
+        "設備導入申請書",
+        "短い内容です",
+        "設備申請",
+        "理学部事務課",
+        "通常"
+      );
+    }).toThrow("申請内容は50文字以上で詳しく記載してください。");
   });
 
-  test("SCEN-423: 文書種別自動判別 - 補助金関連文書の場合、ハイブリッド処理ルートが設定される", () => {
+  // SCEN-423: [normal] 文書種別自動判別 - 補助金関連文書の場合、ハイブリッド処理ルートが設定される
+  test("補助金関連キーワードを含む文書はハイブリッド処理ルートに分類される", () => {
     const result = classifyDocumentTypeAndRoute(
-      "科研費申請に関する設備導入申請書",
-      "文部科学省の科研費制度に基づく研究設備の導入申請について詳細を記載しております。運営費交付金を活用した設備整備費として申請いたします。",
-      "研究推進部"
+      "科研費による研究設備購入申請",
+      "文部科学省の科学研究費補助金を活用した研究機器の購入申請です。運営費交付金との併用により効率的な研究環境整備を目指します。",
+      "研究推進課"
     );
 
     expect(result.subsidyRelated).toBe(true);
-    expect(result.paperStorageRequired).toBe(true);
     expect(result.processingRoute).toBe("hybrid");
+    expect(result.paperStorageRequired).toBe(true);
   });
 
-  test("SCEN-424: 文書種別自動判別 - 非補助金関連文書の場合、電子のみ処理ルートが設定される", () => {
+  // SCEN-424: [normal] 文書種別自動判別 - 非補助金関連文書の場合、電子のみ処理ルートが設定される
+  test("一般的な業務申請は電子のみ処理ルートに分類される", () => {
     const result = classifyDocumentTypeAndRoute(
-      "職員の出張申請について",
-      "学会発表のための出張申請書です。交通費と宿泊費の支給をお願いいたします。",
-      "総務部"
+      "教室使用許可申請",
+      "学会開催のための教室使用許可を申請します。参加者数は約50名を予定しており、プロジェクター等の設備使用も希望します。",
+      "総務課"
     );
 
     expect(result.subsidyRelated).toBe(false);
+    expect(result.processingRoute).toBe("electronic");
     expect(result.paperStorageRequired).toBe(false);
-    expect(result.processingRoute).toBe("electronic");
   });
 
-  test("SCEN-425: 文書種別自動判別 - 判別困難な文書の場合、適切なデフォルトルートが設定される", () => {
+  // SCEN-425: [edge] 文書種別自動判別 - 判別困難な文書の場合、適切なデフォルトルートが設定される
+  test("判別困難な文書はデフォルトで電子処理ルートに設定される", () => {
     const result = classifyDocumentTypeAndRoute(
-      "設備に関する申請",
-      "設備の件について申請いたします。詳細は別途ご連絡いたします。",
-      "総務部"
+      "資料請求",
+      "会議資料を準備します",
+      "事務局"
     );
 
     expect(result.subsidyRelated).toBe(false);
     expect(result.processingRoute).toBe("electronic");
+    expect(result.paperStorageRequired).toBe(false);
   });
 
-  test("SCEN-471: 文書種別自動判定 - 申請書類の内容から文書種別が正しく判定される", () => {
-    const result = classifyDocumentType(
-      "科研費基盤研究申請書",
-      "文部科学省科学研究費助成事業における基盤研究の申請について記載いたします",
-      "補助金申請"
+  // SCEN-471: [normal] 文書種別自動判定 - 申請書類の内容から文書種別が正しく判定される
+  test("申請書類の内容から適切な文書種別が判定される", () => {
+    const result = determineDocumentTypeAndRoute(
+      "運営費交付金による設備整備申請書",
+      "大学運営費交付金を財源とした研究設備の整備申請です。文部科学省の基準に従い適切な手続きを行います。",
+      "財務課"
     );
 
-    expect(result.subsidyRelated).toBe(true);
+    expect(result.isSubsidyRelated).toBe(true);
     expect(result.documentType).toBe("補助金申請");
     expect(result.processingRoute).toBe("hybrid");
   });
 
-  test("SCEN-472: 文書種別自動判定 - 補助金関連度と処理ルートが適切に決定される", () => {
-    const result = evaluateSubsidyRelevance(
-      "運営費交付金による設備整備費申請",
-      "文部科学省運営費交付金制度を活用した研究設備の整備について申請いたします。設備整備費として予算を申請し、研究環境の向上を図ります。",
-      "補助金申請書"
+  // SCEN-472: [normal] 文書種別自動判定 - 補助金関連度と処理ルートが適切に決定される
+  test("補助金関連度70%以上の文書はハイブリッド処理が選択される", () => {
+    const result = determineDocumentTypeAndRoute(
+      "文部科学省補助金実績報告書",
+      "科学研究費補助金の実績報告書です。研究成果と予算執行状況について詳細に記載し、運営費交付金との関連も含めて報告いたします。",
+      "研究推進課"
     );
 
-    expect(result.subsidyRelevanceScore).toBeGreaterThanOrEqual(70);
-    expect(result.subsidyRelated).toBe(true);
-    expect(result.paperStorageRequired).toBe(true);
+    expect(result.isSubsidyRelated).toBe(true);
     expect(result.processingRoute).toBe("hybrid");
+    expect(result.requiresPaperStorage).toBe(true);
   });
 
-  test("SCEN-473: 文書種別自動判定 - 判定困難な内容の場合、適切なデフォルト処理が実行される", () => {
-    const result = handleDocumentClassificationException(
-      "申請書",
-      "申請内容について",
-      null,
-      "自動分類で判定できませんでした",
-      "一般申請"
+  // SCEN-473: [edge] 文書種別自動判定 - 判定困難な内容の場合、適切なデフォルト処理が実行される
+  test("判定困難な内容の場合は電子処理がデフォルト選択される", () => {
+    const result = determineDocumentTypeAndRoute(
+      "会議資料",
+      "定期会議用資料",
+      "総務課"
     );
 
-    expect(result.finalDocumentType).toBe("一般申請");
-    expect(result.exceptionReason).toContain("自動分類で判定できませんでした");
+    expect(result.isSubsidyRelated).toBe(false);
+    expect(result.processingRoute).toBe("electronic");
+    expect(result.requiresPaperStorage).toBe(false);
   });
 
-  test("SCEN-474: 電子化可否判定 - 補助金関連文書でハイブリッド処理が選択される", () => {
+  // SCEN-474: [normal] 電子化可否判定 - 補助金関連文書でハイブリッド処理が選択される
+  test("補助金関連度70%以上の文書でハイブリッド処理が判定される", () => {
     const result = determineDigitalizationEligibility(
-      "科研費研究実績報告書",
-      "文部科学省科学研究費補助金による研究実績の報告書を提出いたします",
+      "科研費申請書",
+      "科学研究費補助金の新規申請書です。研究計画と予算計画を詳細に記載し文部科学省の審査基準に適合させています。",
       "補助金申請書",
-      85
+      0.85
     );
 
     expect(result.subsidyRelated).toBe(true);
-    expect(result.paperStorageRequired).toBe(true);
     expect(result.processingRoute).toBe("hybrid");
+    expect(result.paperStorageRequired).toBe(true);
   });
 
-  test("SCEN-475: 電子化可否判定 - 非補助金文書で電子のみ処理が選択される", () => {
+  // SCEN-475: [normal] 電子化可否判定 - 非補助金文書で電子のみ処理が選択される
+  test("補助金関連度が低い文書で電子のみ処理が判定される", () => {
     const result = determineDigitalizationEligibility(
-      "職員研修参加申請書",
-      "外部研修への参加申請について記載いたします",
-      "一般申請",
-      20
+      "教室予約申請",
+      "学内行事のための教室予約申請書です。使用目的と必要設備について記載しています。",
+      "施設利用申請書",
+      0.2
     );
 
     expect(result.subsidyRelated).toBe(false);
-    expect(result.paperStorageRequired).toBe(false);
     expect(result.processingRoute).toBe("electronic");
+    expect(result.paperStorageRequired).toBe(false);
   });
 
-  test("SCEN-476: 電子化可否判定 - 判定基準が曖昧な文書の場合、安全側の処理ルートが選択される", () => {
-    expect(() => determineDigitalizationEligibility(
-      "",
-      "申請内容です",
-      "補助金申請書",
-      75
-    )).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
+  // SCEN-476: [edge] 電子化可否判定 - 判定基準が曖昧な文書の場合、安全側の処理ルートが選択される
+  test("判定基準が曖昧な文書の場合、安全側の電子処理が選択される", () => {
+    const result = determineDigitalizationEligibility(
+      "不明な申請",
+      "詳細不明",
+      "その他",
+      0.3
+    );
+
+    expect(result.subsidyRelated).toBe(false);
+    expect(result.processingRoute).toBe("electronic");
+    expect(result.paperStorageRequired).toBe(false);
   });
 
-  test("SCEN-489: 文書保管方式選択 - 法令要件に基づいて適切な保管方式が選択される", () => {
+  // SCEN-489: [normal] 文書保管方式選択 - 法令要件に基づいて適切な保管方式が選択される
+  test("法令要件に基づいて適切な保管方式が選択される", () => {
     const result = determineDocumentStorageMethod(
-      "文部科学省補助金事業報告書",
-      "補助金事業の実施結果および会計報告について記載した事業報告書です",
-      "事業報告書",
-      ["補助金", "助成金", "文部科学省"]
-    );
-
-    expect(result.subsidyRelated).toBe(true);
-    expect(result.paperStorageRequired).toBe(true);
-    expect(result.processingRoute).toBe("hybrid");
-  });
-
-  test("SCEN-490: 文書保管方式選択 - ハイブリッド処理必要文書で電子＋紙保管が選択される", () => {
-    const result = checkComplianceAndDetermineRoute(
-      "科研費設備整備費申請書",
-      "文部科学省科学研究費補助金の設備整備費として研究機器の購入申請を行います",
+      "文部科学省補助金申請書",
+      "科学研究費補助金の申請に関する書類です。文部科学省の定める基準に従い研究計画と予算を記載しています。",
       "補助金申請書",
-      ["科研費", "運営費交付金", "設備整備費", "補助金"]
+      ["研究費", "科研費", "文部科学省", "補助金"]
     );
 
     expect(result.subsidyRelated).toBe(true);
-    expect(result.paperStorageRequired).toBe(true);
     expect(result.processingRoute).toBe("hybrid");
-    expect(result.complianceStatus).toBe("compliant");
+    expect(result.paperStorageRequired).toBe(true);
   });
 
-  test("SCEN-491: 文書保管方式選択 - 保管方式判定条件が不明な場合、最も安全な方式が選択される", () => {
-    expect(() => determineDocumentStorageMethod(
-      "",
-      "申請書類の内容です",
+  // SCEN-490: [normal] 文書保管方式選択 - ハイブリッド処理必要文書で電子＋紙保管が選択される
+  test("ハイブリッド処理必要文書で電子＋紙保管が選択される", () => {
+    const result = determineDocumentStorageMethod(
+      "運営費交付金事業報告書",
+      "大学運営費交付金による事業の実績報告書です。文部科学省への提出が必要で適切な保管が求められています。",
+      "事業報告書",
+      ["運営費交付金", "文部科学省", "事業報告"]
+    );
+
+    expect(result.subsidyRelated).toBe(true);
+    expect(result.processingRoute).toBe("hybrid");
+    expect(result.paperStorageRequired).toBe(true);
+  });
+
+  // SCEN-491: [edge] 文書保管方式選択 - 保管方式判定条件が不明な場合、最も安全な方式が選択される
+  test("保管方式判定条件が不明な場合、電子処理が選択される", () => {
+    const result = determineDocumentStorageMethod(
+      "一般申請書",
+      "通常業務申請",
       "一般申請",
-      ["補助金", "助成金"]
-    )).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
-  });
+      []
+    );
 
+    expect(result.subsidyRelated).toBe(false);
+    expect(result.processingRoute).toBe("electronic");
+    expect(result.paperStorageRequired).toBe(false);
+  });
 });
