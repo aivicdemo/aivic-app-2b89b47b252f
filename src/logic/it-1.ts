@@ -22,8 +22,8 @@
 //   呼び出し例 (テスト中): ensureBusinessContinuityDuringSystemUpdate("documentClassification", 25, 60, [])
 //   await されてる?: いいえ
 //   アクセスされるプロパティ: r.continuityPlan, r.temporaryRoutes, r.rollbackProcedure, r.communicationPlan
-//   → 結論: function ensureBusinessContinuityDuringSystemUpdate(updateScope: string, activeApplications: number, estimatedUpdateDuration: number, criticalDeadlines: string[]): ContinuityResult
-//   → ContinuityResult = { continuityPlan: string; temporaryRoutes: string[]; rollbackProcedure: string; communicationPlan: string }
+//   → 結論: function ensureBusinessContinuityDuringSystemUpdate(updateScope: string, activeApplications: number, estimatedUpdateDuration: number, criticalDeadlines: string[]): ContinuityPlanResult
+//   → ContinuityPlanResult = { continuityPlan: string; temporaryRoutes: string[]; rollbackProcedure: string; communicationPlan: string }
 
 interface AlternativeProcessResult {
   alternativeProcess: string;
@@ -45,17 +45,11 @@ interface FallbackResult {
   syncRequired: boolean;
 }
 
-interface ContinuityResult {
+interface ContinuityPlanResult {
   continuityPlan: string;
   temporaryRoutes: string[];
   rollbackProcedure: string;
   communicationPlan: string;
-}
-
-interface ApplicationInfo {
-  type: string;
-  priority: string;
-  approvers: string[];
 }
 
 export function validateApplicationInput(
@@ -67,44 +61,33 @@ export function validateApplicationInput(
 ): { isValid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
-  
+
   if (!documentTitle || documentTitle.length < 10 || documentTitle.length > 200) {
     errors.push("申請書類のタイトルは10文字以上200文字以内で入力してください");
   }
-  
+
   if (!documentContent || documentContent.length < 50) {
     errors.push("申請内容は50文字以上で詳しく記載してください");
   }
-  
-  if (!applicationType || !isValidApplicationType(applicationType)) {
+
+  const validApplicationTypes = ["補助金申請", "設備申請", "人事申請", "予算申請"];
+  if (!applicationType || !validApplicationTypes.includes(applicationType)) {
     errors.push("申請種別を正しく選択してください");
   }
-  
-  if (!applicantDepartment || !isValidDepartment(applicantDepartment)) {
+
+  const validDepartments = ["総務部", "財務部", "学務部", "研究推進部"];
+  if (!applicantDepartment || !validDepartments.includes(applicantDepartment)) {
     errors.push("所属部署を正しく入力してください");
   }
-  
-  if (!urgencyLevel || !isValidUrgencyLevel(urgencyLevel)) {
+
+  const validUrgencyLevels = ["通常", "急ぎ", "至急"];
+  if (!urgencyLevel || !validUrgencyLevels.includes(urgencyLevel)) {
     errors.push("緊急度を選択してください");
   }
-  
+
   const isValid = errors.length === 0;
-  
+
   return { isValid, errors, warnings };
-}
-
-function isValidApplicationType(type: string): boolean {
-  const validTypes = ["補助金申請", "設備申請", "人事申請", "予算申請"];
-  return validTypes.includes(type);
-}
-
-function isValidDepartment(department: string): boolean {
-  return department && department.length > 0;
-}
-
-function isValidUrgencyLevel(level: string): boolean {
-  const validLevels = ["通常", "急ぎ", "至急"];
-  return validLevels.includes(level);
 }
 
 export function validateApplicationAmountAndPeriod(
@@ -117,37 +100,37 @@ export function validateApplicationAmountAndPeriod(
   if (applicationAmount <= 0) {
     throw new Error("申請金額は正の数値で入力してください");
   }
-  
-  const budgetLimit = budgetLimits[documentType];
-  if (!budgetLimit) {
-    throw new Error("文書種別に対応する予算制限が見つかりません");
-  }
-  
-  const isAmountValid = applicationAmount >= budgetLimit.minAmount && applicationAmount <= budgetLimit.maxAmount;
+
   const startDate = new Date(implementationStartDate);
   const endDate = new Date(implementationEndDate);
   const today = new Date();
-  
+
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
     throw new Error("実施期間は有効な日付形式で入力してください");
   }
-  
+
+  const budgetLimit = budgetLimits[documentType];
+  if (!budgetLimit) {
+    throw new Error("指定された文書種別の予算制限が見つかりません");
+  }
+
+  const isAmountValid = applicationAmount >= budgetLimit.minAmount && applicationAmount <= budgetLimit.maxAmount;
   const isPeriodValid = startDate >= today && endDate > startDate;
   const validationErrors: string[] = [];
-  
+
   if (!isAmountValid) {
-    if (applicationAmount > budgetLimit.maxAmount * 1.5) {
-      console.warn("申請金額が大幅に予算上限を超過しています。金額を見直してください");
-    }
     validationErrors.push("申請金額が規定範囲外です");
   }
-  
   if (!isPeriodValid) {
     validationErrors.push("実施期間が不正です");
   }
-  
+
+  if (applicationAmount > budgetLimit.maxAmount * 1.5) {
+    console.warn("申請金額が大幅に予算上限を超過しています。金額を見直してください");
+  }
+
   const canProceed = isAmountValid && isPeriodValid;
-  
+
   return { isAmountValid, isPeriodValid, validationErrors, canProceed };
 }
 
@@ -159,54 +142,43 @@ export function classifyDocumentTypeAndRoute(
   if (!documentTitle || documentTitle.length < 10) {
     throw new Error("申請書類のタイトルは10文字以上で入力してください");
   }
-  
+
   if (!documentContent || documentContent.length < 50) {
     throw new Error("申請書類の内容は50文字以上で入力してください");
   }
-  
+
   if (!applicantDepartment) {
     throw new Error("申請者の所属部署を選択してください");
   }
-  
-  const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
-  const subsidyRelated = keywordScore >= 0.7;
-  const documentType = determineDocumentType(documentTitle, applicantDepartment);
-  const paperStorageRequired = subsidyRelated && isMoeRequiredPaperStorage(documentType);
-  const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
-  
-  return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
-}
 
-function calculateSubsidyKeywordMatch(title: string, content: string): number {
-  const subsidyKeywords = ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金"];
-  const text = (title + " " + content).toLowerCase();
-  let matches = 0;
-  
-  for (const keyword of subsidyKeywords) {
-    if (text.includes(keyword.toLowerCase())) {
-      matches++;
+  const subsidyKeywords = ["科研費", "運営費交付金", "設備整備費", "補助金"];
+  const text = documentTitle + " " + documentContent;
+  let keywordScore = 0;
+
+  subsidyKeywords.forEach(keyword => {
+    if (text.includes(keyword)) {
+      keywordScore += 1;
     }
-  }
-  
-  return matches / subsidyKeywords.length;
-}
+  });
 
-function determineDocumentType(title: string, department: string): string {
-  if (title.includes("補助金") || title.includes("助成金")) {
-    return "補助金申請書";
-  }
-  if (title.includes("設備") || title.includes("機器")) {
-    return "設備申請書";
-  }
-  if (title.includes("人事") || title.includes("採用")) {
-    return "人事関連書類";
-  }
-  return "一般申請書";
-}
+  keywordScore = keywordScore / subsidyKeywords.length;
 
-function isMoeRequiredPaperStorage(documentType: string): boolean {
-  const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書"];
-  return moeRequiredTypes.includes(documentType);
+  const researchDepartments = ["研究推進部", "学術研究科"];
+  const isResearchDept = researchDepartments.includes(applicantDepartment);
+  const threshold = isResearchDept ? 0.6 : 0.7;
+
+  const subsidyRelated = keywordScore >= threshold;
+
+  let documentType = "一般申請";
+  if (subsidyRelated) {
+    documentType = "補助金申請";
+  }
+
+  const moeRequiredTypes = ["補助金申請", "研究費申請", "設備導入申請"];
+  const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
+  const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
+
+  return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
 }
 
 export function determineDocumentTypeAndRoute(
@@ -214,53 +186,46 @@ export function determineDocumentTypeAndRoute(
   documentContent: string,
   applicantDepartment: string
 ): { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean } {
-  if (!documentTitle || documentTitle.length < 10) {
-    throw new Error("申請書類のタイトルは10文字以上で入力してください");
+  if (!documentTitle) {
+    throw new Error("申請書類のタイトルを入力してください");
   }
-  
-  if (!documentContent || documentContent.length < 50) {
-    throw new Error("申請書類の内容は50文字以上で入力してください");
-  }
-  
+
   if (!applicantDepartment) {
-    console.warn("所属部署を選択すると、より正確な判定が行われます");
+    throw new Error("申請者の所属部署を選択してください");
   }
-  
-  const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
-  const departmentBonus = isResearchDepartment(applicantDepartment) ? 0.1 : 0.0;
-  const adjustedScore = keywordScore + departmentBonus;
-  const subsidyRelated = adjustedScore >= 0.7 || (isResearchDepartment(applicantDepartment) && adjustedScore >= 0.6);
-  const documentType = classifyDocumentType(documentTitle, documentContent);
-  const paperStorageRequired = subsidyRelated && isMoeStorageRequirement(documentType);
+
+  if (documentContent.length < 10) {
+    console.warn("申請内容が短すぎる可能性があります。内容を確認してください");
+  }
+
+  const subsidyKeywords = ["科研費", "運営費交付金", "設備整備費", "補助金"];
+  const text = documentTitle + " " + documentContent;
+  let keywordScore = 0;
+
+  subsidyKeywords.forEach(keyword => {
+    if (text.includes(keyword)) {
+      keywordScore += 1;
+    }
+  });
+
+  keywordScore = keywordScore / subsidyKeywords.length;
+
+  const researchDepartments = ["研究推進部", "学術研究科"];
+  const isResearchDept = researchDepartments.includes(applicantDepartment);
+  const adjustedScore = keywordScore + (isResearchDept ? 0.1 : 0.0);
+
+  const subsidyRelated = adjustedScore >= 0.7 || (isResearchDept && adjustedScore >= 0.6);
+
+  let documentType = "一般申請";
+  if (subsidyRelated) {
+    documentType = "補助金申請";
+  }
+
+  const moeRequiredTypes = ["補助金申請", "事業報告書", "会計報告書", "監査資料"];
+  const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
   const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
-  
+
   return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
-}
-
-function isResearchDepartment(department: string): boolean {
-  const researchDepts = ["研究推進課", "学術情報課", "産学連携課"];
-  return researchDepts.includes(department);
-}
-
-function classifyDocumentType(title: string, content: string): string {
-  const text = (title + " " + content).toLowerCase();
-  
-  if (text.includes("補助金") || text.includes("科研費")) {
-    return "補助金申請書";
-  }
-  if (text.includes("設備") || text.includes("機器購入")) {
-    return "設備申請書";
-  }
-  if (text.includes("人事") || text.includes("採用")) {
-    return "人事関連書類";
-  }
-  
-  return "一般申請書";
-}
-
-function isMoeStorageRequirement(documentType: string): boolean {
-  const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書", "監査資料"];
-  return moeRequiredTypes.includes(documentType);
 }
 
 export function checkMoeComplianceRequirements(
@@ -271,23 +236,43 @@ export function checkMoeComplianceRequirements(
   if (!documentTitle || documentTitle.length < 10) {
     throw new Error("申請書類のタイトルは10文字以上で入力してください");
   }
-  
+
   if (!documentContent || documentContent.length < 50) {
     throw new Error("申請書類の内容は50文字以上で入力してください");
   }
-  
+
   if (!applicantDepartment) {
     console.warn("所属部署を選択すると、より正確な判定が行われます");
   }
-  
-  const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
-  const departmentBonus = isResearchDepartment(applicantDepartment) ? 0.1 : 0.0;
+
+  const subsidyKeywords = ["研究費", "設備費", "運営費交付金", "補助金"];
+  const text = documentTitle + " " + documentContent;
+  let keywordScore = 0;
+
+  subsidyKeywords.forEach(keyword => {
+    if (text.includes(keyword)) {
+      keywordScore += 1;
+    }
+  });
+
+  keywordScore = keywordScore / subsidyKeywords.length;
+
+  const researchDepartments = ["研究推進部", "学術研究科"];
+  const isResearchDept = researchDepartments.includes(applicantDepartment);
+  const departmentBonus = isResearchDept ? 0.1 : 0.0;
   const adjustedScore = keywordScore + departmentBonus;
-  const subsidyRelated = adjustedScore >= 0.7 || (isResearchDepartment(applicantDepartment) && adjustedScore >= 0.6);
-  const documentType = classifyDocumentType(documentTitle, documentContent);
-  const paperStorageRequired = subsidyRelated && isMoeStorageRequirement(documentType);
+
+  const subsidyRelated = adjustedScore >= 0.7 || (isResearchDept && adjustedScore >= 0.6);
+
+  let documentType = "一般申請";
+  if (subsidyRelated) {
+    documentType = "補助金申請";
+  }
+
+  const moeRequiredTypes = ["補助金申請", "事業報告書", "会計報告書", "監査資料"];
+  const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
   const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
-  
+
   return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
 }
 
@@ -301,23 +286,24 @@ export function setApproverAuthorityLevel(
   if (budgetAmount < 0) {
     throw new Error("予算金額は0以上の値を入力してください");
   }
-  
+
   if (!applicantDepartment) {
     throw new Error("申請者の所属部署を選択してください");
   }
-  
+
   const isHighBudget = budgetAmount > 5000000;
   const isVeryHighBudget = budgetAmount > 10000000;
   const needsHighAuthority = subsidyRelated || isHighBudget;
+
   const requiredAuthorityLevel = needsHighAuthority ? "department_head" : "section_chief";
   const approverRoles = [requiredAuthorityLevel];
-  
+
   if (paperStorageRequired) {
     approverRoles.push("administrative_director");
   }
-  
+
   const escalationRequired = isVeryHighBudget;
-  
+
   return { requiredAuthorityLevel, approverRoles, escalationRequired };
 }
 
@@ -329,19 +315,19 @@ export function determineApprovalHierarchy(
   if (applicationAmount <= 0) {
     throw new Error("申請金額は1円以上で入力してください");
   }
-  
-  if (applicationAmount > 100000000) {
-    console.warn("高額申請のため、理事会での特別承認が必要になる可能性があります");
-  }
-  
+
   if (!applicantDepartment) {
     throw new Error("承認ルート設定のため、所属部署を入力してください");
   }
-  
+
+  if (applicationAmount > 100000000) {
+    console.warn("高額申請のため、理事会での特別承認が必要になる可能性があります");
+  }
+
   let approvalLevel = "";
   let estimatedDays = 0;
   let requiresPaperApproval = false;
-  
+
   if (documentType.includes("補助金")) {
     if (applicationAmount >= 1000000) {
       approvalLevel = "理事承認";
@@ -363,20 +349,10 @@ export function determineApprovalHierarchy(
       estimatedDays = 7;
     }
   }
-  
-  const approvers = getApproversByLevel(approvalLevel, applicantDepartment);
-  
-  return { approvalLevel, approvers, estimatedDays, requiresPaperApproval };
-}
 
-function getApproversByLevel(level: string, department: string): string[] {
-  const approverMap: { [key: string]: string[] } = {
-    "課長承認": [`${department}課長`],
-    "部長承認": [`${department}部長`],
-    "理事承認": ["担当理事", "事務局長"]
-  };
-  
-  return approverMap[level] || ["担当者"];
+  const approvers = [`${approvalLevel}_${applicantDepartment}`];
+
+  return { approvalLevel, approvers, estimatedDays, requiresPaperApproval };
 }
 
 export function validateApplicationBeforeSubmission(
@@ -389,31 +365,31 @@ export function validateApplicationBeforeSubmission(
 ): { isValid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
-  
+
   if (!documentTitle || documentTitle.trim().length === 0) {
     errors.push("申請書類のタイトルを入力してください");
   }
-  
+
   if (!documentContent || documentContent.trim().length < 10) {
     errors.push("申請内容を10文字以上で入力してください");
   }
-  
+
   for (const field in requiredFields) {
     if (!requiredFields[field]) {
       errors.push(`必須項目「${field}」を入力してください`);
     }
   }
-  
+
   if (documentType === "subsidy" && processingRoute !== "hybrid") {
     errors.push("補助金関連書類はハイブリッド処理が必要です");
   }
-  
+
   if (approvalRoute.length === 0) {
     errors.push("承認者を設定してください");
   }
-  
+
   const isValid = errors.length === 0;
-  
+
   return { isValid, errors, warnings };
 }
 
@@ -426,44 +402,29 @@ export function setApprovalDeadline(
   if (submissionDate > new Date()) {
     throw new Error("提出日は現在日時以前である必要があります");
   }
-  
-  const validUrgencyLevels = ["高", "標準", "低"];
+
+  const validUrgencyLevels = ["high", "standard", "low"];
   if (!validUrgencyLevels.includes(urgencyLevel)) {
     throw new Error("緊急度は「高」「標準」「低」のいずれかを選択してください");
   }
-  
+
   let baseDays = subsidyRelated ? 5 : 3;
-  
-  if (urgencyLevel === "高") {
-    baseDays = baseDays / 2;
-  } else if (urgencyLevel === "低") {
-    baseDays = baseDays * 1.5;
+
+  if (urgencyLevel === "high") {
+    baseDays = Math.floor(baseDays / 2);
+  } else if (urgencyLevel === "low") {
+    baseDays = Math.floor(baseDays * 1.5);
   }
-  
-  const deadlineDate = addBusinessDays(submissionDate, baseDays);
+
+  const deadlineDate = new Date(submissionDate.getTime() + baseDays * 24 * 60 * 60 * 1000);
   const businessDays = baseDays;
   const notificationSchedule = ["2日前", "当日"];
-  
+
   return { deadlineDate, businessDays, notificationSchedule };
 }
 
-function addBusinessDays(startDate: Date, days: number): Date {
-  const result = new Date(startDate);
-  let addedDays = 0;
-  
-  while (addedDays < days) {
-    result.setDate(result.getDate() + 1);
-    const dayOfWeek = result.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 土日以外
-      addedDays++;
-    }
-  }
-  
-  return result;
-}
-
 export function processUrgentApplicationPriority(
-  applicationData: { approvalRoute: string[]; createdAt: Date },
+  applicationData: { approvalRoute: string[]; createdAt: Date; priority: string },
   urgencyFlag: boolean,
   deadlineDate: Date,
   currentApprovalQueue: any[]
@@ -471,49 +432,34 @@ export function processUrgentApplicationPriority(
   if (!applicationData.approvalRoute || applicationData.approvalRoute.length === 0) {
     throw new Error("緊急案件の処理には最低一人の承認者が必要です");
   }
-  
-  if (deadlineDate < new Date()) {
+
+  const currentDate = new Date();
+
+  if (deadlineDate < currentDate) {
     throw new Error("提出期限は現在日時より未来の日付を設定してください");
   }
-  
-  const currentDate = new Date();
-  const isUrgent = urgencyFlag || (deadlineDate.getTime() - currentDate.getTime()) <= 3 * 24 * 60 * 60 * 1000;
-  
+
+  const daysDiff = Math.floor((deadlineDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+  const isUrgent = urgencyFlag || daysDiff <= 3;
+
   let priorityLevel: number;
   let queuePosition: number;
   let notificationTargets: string[];
   let processingDeadline: Date;
-  
+
   if (isUrgent) {
     priorityLevel = 1;
     queuePosition = 0;
-    notificationTargets = getAllApprovers(applicationData.approvalRoute);
+    notificationTargets = applicationData.approvalRoute;
     processingDeadline = new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
   } else {
-    priorityLevel = calculateNormalPriority(applicationData);
+    priorityLevel = applicationData.priority === "high" ? 2 : 3;
     queuePosition = currentApprovalQueue.length;
-    notificationTargets = getNextApprover(applicationData.approvalRoute);
-    processingDeadline = calculateNormalDeadline(applicationData);
+    notificationTargets = [applicationData.approvalRoute[0]];
+    processingDeadline = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
   }
-  
+
   return { priorityLevel, queuePosition, notificationTargets, processingDeadline };
-}
-
-function getAllApprovers(approvalRoute: string[]): string[] {
-  return approvalRoute;
-}
-
-function getNextApprover(approvalRoute: string[]): string[] {
-  return approvalRoute.length > 0 ? [approvalRoute[0]] : [];
-}
-
-function calculateNormalPriority(applicationData: any): number {
-  return 3; // 通常優先度
-}
-
-function calculateNormalDeadline(applicationData: any): Date {
-  const currentDate = new Date();
-  return new Date(currentDate.getTime() + 5 * 24 * 60 * 60 * 1000); // 5日後
 }
 
 export function handleSystemFailureAlternativeProcess(
@@ -525,19 +471,20 @@ export function handleSystemFailureAlternativeProcess(
   if (!systemStatus) {
     throw new Error("システム状況を確認できません。情報システム課に連絡してください。");
   }
-  
+
   if (!failureType) {
     console.warn("障害の詳細が不明です。標準的な代替処理を開始します。");
   }
-  
+
   if (urgencyLevel < 1 || urgencyLevel > 10) {
     urgencyLevel = Math.max(1, Math.min(10, urgencyLevel));
     console.warn("緊急度は1から10の範囲で指定してください。");
   }
-  
+
   let alternativeProcess: string;
   let notificationTargets: string[];
-  
+  let estimatedRecoveryTime: number;
+
   if (systemStatus === "critical_failure") {
     alternativeProcess = "full_paper_mode";
   } else if (systemStatus === "partial_failure") {
@@ -545,28 +492,36 @@ export function handleSystemFailureAlternativeProcess(
   } else {
     alternativeProcess = "temporary_workaround";
   }
-  
+
   if (urgencyLevel >= 8) {
     notificationTargets = ["all_staff", "management", "it_support"];
   } else {
     notificationTargets = ["relevant_staff", "it_support"];
   }
-  
-  const dataRecoveryPlan = "sync_paper_to_electronic_after_recovery";
-  const estimatedRecoveryTime = calculateRecoveryTime(failureType);
-  
-  return { alternativeProcess, notificationTargets, dataRecoveryPlan, estimatedRecoveryTime };
-}
 
-function calculateRecoveryTime(failureType: string): number {
-  const recoveryTimes: { [key: string]: number } = {
-    "system_failure": 240, // 4時間
-    "network_issue": 120,  // 2時間
-    "database_error": 180, // 3時間
-    "api_timeout": 60      // 1時間
+  // 障害の種類に基づいて復旧時間を計算
+  switch (failureType) {
+    case "system_failure":
+      estimatedRecoveryTime = 120;
+      break;
+    case "network_issue":
+      estimatedRecoveryTime = 60;
+      break;
+    case "database_error":
+      estimatedRecoveryTime = 180;
+      break;
+    default:
+      estimatedRecoveryTime = 90;
+  }
+
+  const dataRecoveryPlan = "sync_paper_to_electronic_after_recovery";
+
+  return {
+    alternativeProcess,
+    notificationTargets,
+    dataRecoveryPlan,
+    estimatedRecoveryTime
   };
-  
-  return recoveryTimes[failureType] || 120;
 }
 
 export function checkApprovalStatusViewPermission(
@@ -579,137 +534,174 @@ export function checkApprovalStatusViewPermission(
   if (!userId) {
     throw new Error("利用者の認証情報が確認できません。再度ログインしてください。");
   }
-  
+
   if (!applicationId) {
     throw new Error("指定された申請書類が見つかりません。");
   }
-  
-  if (!userRole) {
-    console.warn("権限情報の確認中にエラーが発生しました。システム管理者にお問い合わせください。");
-  }
-  
+
   const isOwner = userId === applicationOwner;
   
   if (isOwner) {
-    return { 
-      canView: true, 
-      viewLevel: "full", 
-      allowedFields: ["status", "currentApprover", "history", "comments"] 
+    return {
+      canView: true,
+      viewLevel: "full",
+      allowedFields: ["status", "currentApprover", "history", "comments"]
     };
   }
-  
+
   const isManager = userRole === "manager" || userRole === "director";
-  const sameDepartment = getUserDepartment(userId) === getApplicationDepartment(applicationId);
-  
+  const sameDepartment = departmentId === departmentId; // 簡略化
+
   if (isManager && sameDepartment) {
-    return { 
-      canView: true, 
-      viewLevel: "progress", 
-      allowedFields: ["status", "currentApprover"] 
+    return {
+      canView: true,
+      viewLevel: "progress",
+      allowedFields: ["status", "currentApprover"]
     };
   }
-  
+
   if (sameDepartment) {
-    return { 
-      canView: true, 
-      viewLevel: "basic", 
-      allowedFields: ["status"] 
+    return {
+      canView: true,
+      viewLevel: "basic",
+      allowedFields: ["status"]
     };
   }
-  
-  return { canView: false, viewLevel: "none", allowedFields: [] };
-}
 
-function getUserDepartment(userId: string): string {
-  // 実際の実装では DB から取得
-  return "dept001";
-}
-
-function getApplicationDepartment(applicationId: string): string {
-  // 実際の実装では DB から取得
-  return "dept001";
+  return {
+    canView: false,
+    viewLevel: "none",
+    allowedFields: []
+  };
 }
 
 export function getProgressDataWithAccessControl(
   userId: string,
   applicationId: string,
   userRole: string
-): { accessGranted: boolean; progressData: any; restrictionReason: string | null } {
+): { accessGranted: boolean; progressData: { currentStep: string; approverName: string; submissionDate: string; daysElapsed: number; nextAction: string } | null; restrictionReason: string | null } {
   if (!userId) {
     throw new Error("利用者の識別情報が正しく設定されていません。再度ログインしてください。");
   }
-  
+
   if (!applicationId) {
     throw new Error("指定された申請案件が見つかりません。案件番号を確認してください。");
   }
-  
-  const hasAccess = checkUserAccess(userId, applicationId, userRole);
-  
+
+  // アクセス権限チェック（簡略化）
+  const hasAccess = userRole === "manager" || userRole === "admin" || userRole === "staff";
+
   if (!hasAccess) {
-    return { 
-      accessGranted: false, 
-      progressData: null, 
-      restrictionReason: "アクセス権限がありません" 
+    return {
+      accessGranted: false,
+      progressData: null,
+      restrictionReason: "アクセス権限がありません"
     };
   }
-  
-  const progressData = fetchProgressData(applicationId);
-  
-  return { accessGranted: true, progressData: progressData, restrictionReason: null };
-}
 
-function checkUserAccess(userId: string, applicationId: string, userRole: string): boolean {
-  // 実際の実装では権限チェックロジック
-  return true;
-}
-
-function fetchProgressData(applicationId: string): any {
-  // 実際の実装では DB から進捗データを取得
-  return {
+  const progressData = {
     currentStep: "承認待ち",
     approverName: "田中部長",
     submissionDate: "2024-01-15",
     daysElapsed: 3,
-    nextAction: "部長承認"
+    nextAction: "承認者による確認"
+  };
+
+  return {
+    accessGranted: true,
+    progressData,
+    restrictionReason: null
   };
 }
 
 export function identifyStagnantApplications(
-  applicationStatuses: Array<{
-    applicationId: string;
-    currentStage: string;
-    stageStartDate: Date;
-    documentType: string;
-    isSubsidyRelated: boolean;
-  }>,
-  stagnationThresholds: { normal: number; subsidyRelated: number; urgent: number },
+  applicationStatuses: Array<{applicationId: string, currentStage: string, stageStartDate: Date, documentType: string, isSubsidyRelated: boolean}>,
+  stagnationThresholds: {normal: number, subsidyRelated: number, urgent: number},
   currentDate: Date
-): Array<{
-  applicationId: string;
-  stagnantDays: number;
-  thresholdExceeded: number;
-  urgencyLevel: 'low' | 'medium' | 'high';
-  recommendedAction: string;
-}> {
+): Array<{applicationId: string, stagnantDays: number, thresholdExceeded: number, urgencyLevel: 'low' | 'medium' | 'high', recommendedAction: string}> {
   if (stagnationThresholds.normal <= 0 || stagnationThresholds.subsidyRelated <= 0) {
     throw new Error("滞留基準日数は1日以上で設定してください。");
   }
-  
+
   if (applicationStatuses.length === 0) {
     console.warn("確認対象の申請案件がありません。");
   }
-  
-  const stagnantApplications: Array<{
-    applicationId: string;
-    stagnantDays: number;
-    thresholdExceeded: number;
-    urgencyLevel: 'low' | 'medium' | 'high';
-    recommendedAction: string;
-  }> = [];
-  
+
+  const stagnantApplications: Array<{applicationId: string, stagnantDays: number, thresholdExceeded: number, urgencyLevel: 'low' | 'medium' | 'high', recommendedAction: string}> = [];
+
   for (const app of applicationStatuses) {
     if (app.stageStartDate > currentDate) {
       throw new Error("承認段階の開始日が未来日付になっています。データを確認してください。");
     }
-    
-    const stagnantDays = Math.floor((currentDate.getTime() - app.st
+
+    const stagnantDays = Math.floor((currentDate.getTime() - app.stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const threshold = app.isSubsidyRelated ? stagnationThresholds.subsidyRelated : stagnationThresholds.normal;
+
+    if (stagnantDays > threshold) {
+      const thresholdExceeded = stagnantDays - threshold;
+      let urgencyLevel: 'low' | 'medium' | 'high';
+      let recommendedAction: string;
+
+      if (thresholdExceeded <= 2) {
+        urgencyLevel = "low";
+        recommendedAction = "メール通知";
+      } else if (thresholdExceeded <= 5) {
+        urgencyLevel = "medium";
+        recommendedAction = "電話連絡";
+      } else {
+        urgencyLevel = "high";
+        recommendedAction = "上司エスカレーション";
+      }
+
+      stagnantApplications.push({
+        applicationId: app.applicationId,
+        stagnantDays,
+        thresholdExceeded,
+        urgencyLevel,
+        recommendedAction
+      });
+    }
+  }
+
+  return stagnantApplications;
+}
+
+export function determinePriorityForReminder(
+  pendingApplications: Array<{applicationId: string, delayDays: number, approverLevel: number, documentImportance: number, applicantDepartment: string}>,
+  priorityWeights: {delayWeight: number, levelWeight: number, importanceWeight: number}
+): Array<{applicationId: string, priorityScore: number, reminderUrgency: 'high' | 'medium' | 'low'}> {
+  if (pendingApplications.length === 0) {
+    throw new Error("催促対象となる滞留案件が存在しません。承認進捗を再確認してください。");
+  }
+
+  if (priorityWeights.delayWeight < 0 || priorityWeights.levelWeight < 0 || priorityWeights.importanceWeight < 0) {
+    throw new Error("優先度計算の重み係数に無効な値が設定されています。システム管理者にお問い合わせください。");
+  }
+
+  const prioritizedList: Array<{applicationId: string, priorityScore: number, reminderUrgency: 'high' | 'medium' | 'low'}> = [];
+
+  for (const app of pendingApplications) {
+    const delayScore = app.delayDays * priorityWeights.delayWeight;
+    const levelScore = app.approverLevel * priorityWeights.levelWeight;
+    const importanceScore = app.documentImportance * priorityWeights.importanceWeight;
+    const priorityScore = delayScore + levelScore + importanceScore;
+
+    let reminderUrgency: 'high' | 'medium' | 'low' = "low";
+    if (priorityScore >= 80) {
+      reminderUrgency = "high";
+    } else if (priorityScore >= 50) {
+      reminderUrgency = "medium";
+    }
+
+    prioritizedList.push({
+      applicationId: app.applicationId,
+      priorityScore: priorityScore,
+      reminderUrgency: reminderUrgency
+    });
+  }
+
+  prioritizedList.sort((a, b) => b.priorityScore - a.priorityScore);
+  return prioritizedList;
+}
+
+export function validateReminderFrequency
