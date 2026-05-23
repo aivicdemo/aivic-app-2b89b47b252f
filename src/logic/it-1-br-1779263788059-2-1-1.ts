@@ -1,15 +1,19 @@
-```typescript
 // SIG-PLAN:
 // - 関数名: validateApplicationBeforeSubmission
 //   呼び出し例 (テスト中): validateApplicationBeforeSubmission(documentTitle, documentContent, documentType, processingRoute, approvalRoute, requiredFields)
 //   await されてる?: いいえ
-//   アクセスされるプロパティ: result.isValid, result.errors, result.warnings
+//   アクセスされるプロパティ: result.isValid, result.errors
 //   → 結論: function validateApplicationBeforeSubmission(documentTitle: string, documentContent: string, documentType: string, processingRoute: string, approvalRoute: string[], requiredFields: Record<string, any>): { isValid: boolean; errors: string[]; warnings: string[] }
 // - 関数名: analyzeRegulationImpactScope
 //   呼び出し例 (テスト中): analyzeRegulationImpactScope(regulationChangeContent, affectedRegulationTypes, currentDocumentTypes)
 //   await されてる?: いいえ
-//   アクセスされるプロパティ: result.affectedDocumentTypes, result.processingRouteChanges, result.impactLevel, result.changeRequiredCount
+//   アクセスされるプロパティ: result.affectedDocumentTypes, result.changeRequiredCount
 //   → 結論: function analyzeRegulationImpactScope(regulationChangeContent: string, affectedRegulationTypes: string[], currentDocumentTypes: Array<{typeName: string, regulationCategory: string, storageRequirement: string}>): RegulationImpactAnalysis
+// - 関数名: classifyLegalChangeImpactLevel
+//   呼び出し例 (テスト中): classifyLegalChangeImpactLevel(changeNotification, affectedDocumentTypes, currentProcessingRules, complianceDeadline)
+//   await されてる?: いいえ
+//   アクセスされるプロパティ: result.impactLevel, result.priority, result.requiredResponseDays, result.affectedRuleCount, result.riskAssessment
+//   → 結論: function classifyLegalChangeImpactLevel(changeNotification: string, affectedDocumentTypes: string[], currentProcessingRules: object[], complianceDeadline: Date): { impactLevel: string; priority: number; requiredResponseDays: number; affectedRuleCount: number; riskAssessment: string }
 // - 関数名: migrateExistingDataToNewClassification
 //   呼び出し例 (テスト中): migrateExistingDataToNewClassification(newClassificationRules, existingDocuments, migrationScope)
 //   await されてる?: いいえ
@@ -24,7 +28,7 @@ interface ClassificationRule {
 
 interface Document {
   id: string;
-  documentType: string;
+  type: string;
   current_processing_route: string;
 }
 
@@ -41,12 +45,6 @@ interface MigrationResult {
   updatedRoutes: RouteUpdate[];
 }
 
-interface ProcessingRouteChange {
-  documentType: string;
-  oldRoute: string;
-  newRoute: string;
-}
-
 interface RegulationImpactAnalysis {
   affectedDocumentTypes: string[];
   processingRouteChanges: ProcessingRouteChange[];
@@ -54,7 +52,12 @@ interface RegulationImpactAnalysis {
   changeRequiredCount: number;
 }
 
-// 申請書類提出前の妥当性検証
+interface ProcessingRouteChange {
+  documentType: string;
+  oldRoute: string;
+  newRoute: string;
+}
+
 export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,
@@ -90,21 +93,20 @@ export function validateApplicationInput(
   return { isValid, errors, warnings };
 }
 
-function isValidApplicationType(type: string): boolean {
+function isValidApplicationType(applicationType: string): boolean {
   const validTypes = ["補助金申請", "設備申請", "人事申請", "予算申請"];
-  return validTypes.includes(type);
+  return validTypes.includes(applicationType);
 }
 
 function isValidDepartment(department: string): boolean {
-  return department.length > 0;
+  return department && department.length > 0;
 }
 
-function isValidUrgencyLevel(level: string): boolean {
+function isValidUrgencyLevel(urgencyLevel: string): boolean {
   const validLevels = ["通常", "急ぎ", "至急"];
-  return validLevels.includes(level);
+  return validLevels.includes(urgencyLevel);
 }
 
-// 申請金額と期間の妥当性検証
 export function validateApplicationAmountAndPeriod(
   applicationAmount: number,
   implementationStartDate: string,
@@ -119,19 +121,16 @@ export function validateApplicationAmountAndPeriod(
   const today = new Date();
   const isPeriodValid = startDate >= today && endDate > startDate;
   const validationErrors: string[] = [];
-  
   if (!isAmountValid) {
     validationErrors.push("申請金額が規定範囲外です");
   }
   if (!isPeriodValid) {
     validationErrors.push("実施期間が不正です");
   }
-  
   const canProceed = isAmountValid && isPeriodValid;
   return { isAmountValid, isPeriodValid, validationErrors, canProceed };
 }
 
-// 文書種別と処理ルートの分類
 export function classifyDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
@@ -149,13 +148,11 @@ function calculateSubsidyKeywordMatch(title: string, content: string): number {
   const subsidyKeywords = ["科研費", "運営費交付金", "設備整備費", "補助金"];
   const text = (title + " " + content).toLowerCase();
   let matches = 0;
-  
   for (const keyword of subsidyKeywords) {
     if (text.includes(keyword.toLowerCase())) {
       matches++;
     }
   }
-  
   return matches / subsidyKeywords.length;
 }
 
@@ -170,37 +167,11 @@ function determineDocumentType(title: string, department: string): string {
 }
 
 function isMoeRequiredPaperStorage(documentType: string): boolean {
-  const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書", "監査資料"];
+  const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書"];
   return moeRequiredTypes.includes(documentType);
 }
 
-// 文書種別と処理ルートの決定
 export function determineDocumentTypeAndRoute(
-  documentTitle: string,
-  documentContent: string,
-  applicantDepartment: string
-): { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean } {
-  const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
-  const subsidyRelated = keywordScore >= 0.7;
-  const paperStorageRequired = subsidyRelated && checkMoeRequirement(documentTitle, applicantDepartment);
-  const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
-  const documentType = determineDocumentCategory(documentTitle, applicantDepartment, subsidyRelated);
-  return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
-}
-
-function checkMoeRequirement(title: string, department: string): boolean {
-  return title.includes("補助金") || title.includes("科研費");
-}
-
-function determineDocumentCategory(title: string, department: string, subsidyRelated: boolean): string {
-  if (subsidyRelated) {
-    return "補助金申請書";
-  }
-  return "一般申請書";
-}
-
-// 文部科学省要件チェック
-export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string
@@ -216,7 +187,7 @@ export function checkMoeComplianceRequirements(
 }
 
 function isResearchDepartment(department: string): boolean {
-  const researchDepts = ["研究推進課", "学術研究院", "研究支援課"];
+  const researchDepts = ["研究推進部", "学術研究院", "研究科"];
   return researchDepts.some(dept => department.includes(dept));
 }
 
@@ -224,14 +195,52 @@ function classifyDocumentType(title: string, content: string): string {
   if (title.includes("補助金") || content.includes("補助金")) {
     return "補助金申請書";
   }
+  if (title.includes("研究費") || content.includes("研究費")) {
+    return "研究費申請書";
+  }
   return "一般申請書";
 }
 
 function isMoeStorageRequirement(documentType: string): boolean {
-  return documentType === "補助金申請書";
+  const moeTypes = ["補助金申請書", "研究費申請書", "事業報告書"];
+  return moeTypes.includes(documentType);
 }
 
-// 承認者権限レベル設定
+export function checkMoeComplianceRequirements(
+  documentTitle: string,
+  documentContent: string,
+  applicantDepartment: string
+): { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean } {
+  const keywordScore = calculateMoeKeywordMatch(documentTitle, documentContent);
+  const isResearchDept = checkResearchDepartment(applicantDepartment);
+  const threshold = isResearchDept ? 0.6 : 0.7;
+  const subsidyRelated = keywordScore >= threshold;
+  const documentType = classifyDocumentType(documentTitle, documentContent);
+  const paperStorageRequired = subsidyRelated && requiresPaperStorage(documentType);
+  const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
+  return { documentType, processingRoute, subsidyRelated, paperStorageRequired };
+}
+
+function calculateMoeKeywordMatch(title: string, content: string): number {
+  const moeKeywords = ["文部科学省", "補助金", "科研費", "運営費交付金"];
+  const text = (title + " " + content).toLowerCase();
+  let score = 0;
+  for (const keyword of moeKeywords) {
+    if (text.includes(keyword.toLowerCase())) {
+      score += 0.25;
+    }
+  }
+  return Math.min(score, 1.0);
+}
+
+function checkResearchDepartment(department: string): boolean {
+  return isResearchDepartment(department);
+}
+
+function requiresPaperStorage(documentType: string): boolean {
+  return isMoeStorageRequirement(documentType);
+}
+
 export function setApproverAuthorityLevel(
   documentType: string,
   subsidyRelated: boolean,
@@ -244,16 +253,13 @@ export function setApproverAuthorityLevel(
   const needsHighAuthority = subsidyRelated || isHighBudget;
   const requiredAuthorityLevel = needsHighAuthority ? "department_head" : "section_chief";
   const approverRoles = [requiredAuthorityLevel];
-  
   if (paperStorageRequired) {
     approverRoles.push("administrative_director");
   }
-  
   const escalationRequired = isVeryHighBudget;
   return { requiredAuthorityLevel, approverRoles, escalationRequired };
 }
 
-// 承認階層決定
 export function determineApprovalHierarchy(
   applicationAmount: number,
   documentType: string,
@@ -290,19 +296,14 @@ export function determineApprovalHierarchy(
 }
 
 function getApproversByLevel(level: string, department: string): string[] {
-  switch (level) {
-    case "課長承認":
-      return [`${department}課長`];
-    case "部長承認":
-      return [`${department}部長`];
-    case "理事承認":
-      return [`${department}部長`, "理事"];
-    default:
-      return [];
-  }
+  const approverMap: { [key: string]: string[] } = {
+    "課長承認": ["課長"],
+    "部長承認": ["部長"],
+    "理事承認": ["理事"]
+  };
+  return approverMap[level] || ["課長"];
 }
 
-// 申請書類提出前検証
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
   documentContent: string,
@@ -341,7 +342,6 @@ export function validateApplicationBeforeSubmission(
   return { isValid, errors, warnings };
 }
 
-// 承認期限設定
 export function setApprovalDeadline(
   documentType: string,
   subsidyRelated: boolean,
@@ -363,18 +363,15 @@ export function setApprovalDeadline(
 function addBusinessDays(date: Date, days: number): Date {
   const result = new Date(date);
   let addedDays = 0;
-  
   while (addedDays < days) {
     result.setDate(result.getDate() + 1);
     if (result.getDay() !== 0 && result.getDay() !== 6) {
       addedDays++;
     }
   }
-  
   return result;
 }
 
-// 緊急申請優先度処理
 export function processUrgentApplicationPriority(
   applicationData: { approvalRoute: string[]; createdAt: Date; priority: string },
   urgencyFlag: boolean,
@@ -383,7 +380,6 @@ export function processUrgentApplicationPriority(
 ): { priorityLevel: number; queuePosition: number; notificationTargets: string[]; processingDeadline: Date } {
   const currentDate = new Date();
   const isUrgent = urgencyFlag || (deadlineDate.getTime() - currentDate.getTime()) <= 3 * 24 * 60 * 60 * 1000;
-  
   let priorityLevel: number;
   let queuePosition: number;
   let notificationTargets: string[];
@@ -400,7 +396,6 @@ export function processUrgentApplicationPriority(
     notificationTargets = getNextApprover(applicationData.approvalRoute);
     processingDeadline = calculateNormalDeadline(applicationData);
   }
-  
   return { priorityLevel, queuePosition, notificationTargets, processingDeadline };
 }
 
@@ -408,19 +403,23 @@ function getAllApprovers(approvalRoute: string[]): string[] {
   return approvalRoute;
 }
 
-function calculateNormalPriority(applicationData: any): number {
-  return applicationData.priority === "high" ? 2 : 3;
+function calculateNormalPriority(applicationData: { priority: string }): number {
+  const priorityMap: { [key: string]: number } = {
+    "high": 2,
+    "medium": 3,
+    "low": 4
+  };
+  return priorityMap[applicationData.priority] || 3;
 }
 
 function getNextApprover(approvalRoute: string[]): string[] {
   return approvalRoute.slice(0, 1);
 }
 
-function calculateNormalDeadline(applicationData: any): Date {
-  return new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+function calculateNormalDeadline(applicationData: { createdAt: Date }): Date {
+  return new Date(applicationData.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
 }
 
-// システム障害時代替処理
 export function handleSystemFailureAlternativeProcess(
   systemStatus: string,
   failureType: string,
@@ -428,7 +427,6 @@ export function handleSystemFailureAlternativeProcess(
   urgencyLevel: number
 ): { alternativeProcess: string; notificationTargets: string[]; dataRecoveryPlan: string; estimatedRecoveryTime: number } {
   let alternativeProcess: string;
-  
   if (systemStatus === "critical_failure") {
     alternativeProcess = "full_paper_mode";
   } else if (systemStatus === "partial_failure") {
@@ -451,19 +449,15 @@ export function handleSystemFailureAlternativeProcess(
 }
 
 function calculateRecoveryTime(failureType: string): number {
-  switch (failureType) {
-    case "network":
-      return 60;
-    case "database":
-      return 120;
-    case "application":
-      return 180;
-    default:
-      return 240;
-  }
+  const recoveryTimes: { [key: string]: number } = {
+    "database_failure": 240,
+    "network_failure": 120,
+    "application_error": 60,
+    "hardware_failure": 480
+  };
+  return recoveryTimes[failureType] || 120;
 }
 
-// 承認状況閲覧権限チェック
 export function checkApprovalStatusViewPermission(
   userId: string,
   applicationId: string,
@@ -475,18 +469,14 @@ export function checkApprovalStatusViewPermission(
   if (isOwner) {
     return { canView: true, viewLevel: "full", allowedFields: ["status", "currentApprover", "history", "comments"] };
   }
-  
   const isManager = userRole === "manager" || userRole === "director";
   const sameDepartment = getUserDepartment(userId) === getApplicationDepartment(applicationId);
-  
   if (isManager && sameDepartment) {
     return { canView: true, viewLevel: "progress", allowedFields: ["status", "currentApprover"] };
   }
-  
   if (sameDepartment) {
     return { canView: true, viewLevel: "basic", allowedFields: ["status"] };
   }
-  
   return { canView: false, viewLevel: "none", allowedFields: [] };
 }
 
@@ -498,7 +488,6 @@ function getApplicationDepartment(applicationId: string): string {
   return "default_department";
 }
 
-// 進捗データアクセス制御
 export function getProgressDataWithAccessControl(
   userId: string,
   applicationId: string,
@@ -518,26 +507,23 @@ function checkUserAccess(userId: string, applicationId: string, userRole: string
 
 function fetchProgressData(applicationId: string): { currentStep: string; approverName: string; submissionDate: string; daysElapsed: number; nextAction: string } {
   return {
-    currentStep: "部長承認待ち",
+    currentStep: "承認待ち",
     approverName: "田中部長",
     submissionDate: "2024-01-15",
     daysElapsed: 3,
-    nextAction: "承認者への催促"
+    nextAction: "承認者による確認"
   };
 }
 
-// 滞留案件特定
 export function identifyStagnantApplications(
   applicationStatuses: Array<{applicationId: string, currentStage: string, stageStartDate: Date, documentType: string, isSubsidyRelated: boolean}>,
   stagnationThresholds: {normal: number, subsidyRelated: number, urgent: number},
   currentDate: Date
 ): Array<{applicationId: string, stagnantDays: number, thresholdExceeded: number, urgencyLevel: 'low' | 'medium' | 'high', recommendedAction: string}> {
   const stagnantApplications: Array<{applicationId: string, stagnantDays: number, thresholdExceeded: number, urgencyLevel: 'low' | 'medium' | 'high', recommendedAction: string}> = [];
-  
   for (const app of applicationStatuses) {
     const stagnantDays = Math.floor((currentDate.getTime() - app.stageStartDate.getTime()) / (1000 * 60 * 60 * 24));
     const threshold = app.isSubsidyRelated ? stagnationThresholds.subsidyRelated : stagnationThresholds.normal;
-    
     if (stagnantDays > threshold) {
       const thresholdExceeded = stagnantDays - threshold;
       const urgencyLevel: 'low' | 'medium' | 'high' = thresholdExceeded <= 2 ? "low" : thresholdExceeded <= 5 ? "medium" : "high";
@@ -545,42 +531,35 @@ export function identifyStagnantApplications(
       stagnantApplications.push({ applicationId: app.applicationId, stagnantDays, thresholdExceeded, urgencyLevel, recommendedAction });
     }
   }
-  
   return stagnantApplications;
 }
 
-// 催促優先度決定
 export function determinePriorityForReminder(
   pendingApplications: Array<{applicationId: string, delayDays: number, approverLevel: number, documentImportance: number, applicantDepartment: string}>,
   priorityWeights: {delayWeight: number, levelWeight: number, importanceWeight: number}
 ): Array<{applicationId: string, priorityScore: number, reminderUrgency: 'high' | 'medium' | 'low'}> {
   const prioritizedList: Array<{applicationId: string, priorityScore: number, reminderUrgency: 'high' | 'medium' | 'low'}> = [];
-  
   for (const app of pendingApplications) {
     const delayScore = app.delayDays * priorityWeights.delayWeight;
     const levelScore = app.approverLevel * priorityWeights.levelWeight;
     const importanceScore = app.documentImportance * priorityWeights.importanceWeight;
     const priorityScore = delayScore + levelScore + importanceScore;
-    
     let reminderUrgency: 'high' | 'medium' | 'low' = "low";
     if (priorityScore >= 80) {
       reminderUrgency = "high";
     } else if (priorityScore >= 50) {
       reminderUrgency = "medium";
     }
-    
     prioritizedList.push({
       applicationId: app.applicationId,
       priorityScore: priorityScore,
       reminderUrgency: reminderUrgency
     });
   }
-  
   prioritizedList.sort((a, b) => b.priorityScore - a.priorityScore);
   return prioritizedList;
 }
 
-// 催促頻度検証
 export function validateReminderFrequency(
   applicationId: string,
   targetApproverId: string,
@@ -594,7 +573,6 @@ export function validateReminderFrequency(
   return { canSendReminder, waitingDays, nextAllowedDate };
 }
 
-// 催促メッセージ生成
 export function generateReminderMessage(
   applicationId: string,
   stagnationDays: number,
@@ -608,32 +586,25 @@ export function generateReminderMessage(
   } else if (stagnationDays >= 8) {
     urgencyLevel = "high";
   }
-  
   if (documentType.includes("補助金")) {
     if (urgencyLevel === "low") urgencyLevel = "medium";
     else if (urgencyLevel === "medium") urgencyLevel = "high";
   }
-  
   const messageContent = generateMessageByUrgency(urgencyLevel, applicantName, documentType, stagnationDays);
   const notificationMethod: 'email' | 'system' | 'both' = urgencyLevel === "low" ? "system" : urgencyLevel === "medium" ? "both" : "email";
-  
   return { messageContent, urgencyLevel, notificationMethod };
 }
 
-function generateMessageByUrgency(urgency: string, applicant: string, docType: string, days: number): string {
-  switch (urgency) {
-    case "low":
-      return `${applicant}様からの${docType}について、承認をお待ちしております（${days}日経過）`;
-    case "medium":
-      return `【要確認】${applicant}様からの${docType}の承認が${days}日間滞留しています`;
-    case "high":
-      return `【緊急】${applicant}様からの${docType}の承認が${days}日間滞留しています。至急対応をお願いします`;
-    default:
-      return "承認をお待ちしております";
+function generateMessageByUrgency(urgencyLevel: string, applicantName: string, documentType: string, stagnationDays: number): string {
+  const baseMessage = `${applicantName}様からの${documentType}について、${stagnationDays}日間承認待ちとなっております。`;
+  if (urgencyLevel === "high") {
+    return baseMessage + "至急ご確認をお願いいたします。";
+  } else if (urgencyLevel === "medium") {
+    return baseMessage + "お時間のある時にご確認ください。";
   }
+  return baseMessage + "ご確認をお願いいたします。";
 }
 
-// 通知受信者特定
 export function identifyNotificationRecipient(
   applicationId: string,
   documentType: string,
@@ -642,7 +613,6 @@ export function identifyNotificationRecipient(
   approverAvailability: boolean
 ): { recipientId: string; recipientType: string; notificationMethod: string; escalationRequired: boolean } {
   const primaryApprover = getApproverByStage(documentType, currentApprovalStage);
-  
   let recipientId: string;
   let recipientType: string;
   let escalationRequired: boolean;
@@ -653,17 +623,4 @@ export function identifyNotificationRecipient(
     escalationRequired = false;
   } else {
     const substitute = findSubstituteApprover(documentType, currentApprovalStage);
-    if (substitute != null) {
-      recipientId = substitute.id;
-      recipientType = "substitute_approver";
-      escalationRequired = false;
-    } else {
-      const superior = findSuperiorApprover(documentType, currentApprovalStage);
-      recipientId = superior.id;
-      recipientType = "superior_approver";
-      escalationRequired = true;
-    }
-  }
-  
-  const isHighPriority = documentType.includes("subsidy") || documentType.includes("grant");
-  const not
+    if (substitute
