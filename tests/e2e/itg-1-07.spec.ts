@@ -13,28 +13,28 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-103
-  test("履歴種別タブ切り替えで表示内容が更新される", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 履歴種別タブ切り替えで表示内容が更新される", async ({ page }) => {
     const approvalTab = page.locator('[data-testid="approval-tab"]');
     const notificationTab = page.locator('[data-testid="notification-tab"]');
     const historyList = page.locator('[data-testid="history-list"]');
 
-    await expect(approvalTab).toBeVisible();
-    await expect(notificationTab).toBeVisible();
-
-    await approvalTab.click();
     await expect(approvalTab).toHaveClass(/active/);
-    await expect(historyList).toBeVisible();
+    const approvalContent = await historyList.textContent();
+    expect(approvalContent).toContain("申請日時");
 
     await notificationTab.click();
     await expect(notificationTab).toHaveClass(/active/);
-    await expect(historyList).toBeVisible();
+    const notificationContent = await historyList.textContent();
+    expect(notificationContent).toContain("通知日時");
 
     await approvalTab.click();
     await expect(approvalTab).toHaveClass(/active/);
+    const revertedContent = await historyList.textContent();
+    expect(revertedContent).toContain("申請日時");
   });
 
   // SCEN-104
-  test("期間指定で該当期間の履歴が表示される", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 期間指定で該当期間の履歴が表示される", async ({ page }) => {
     await page.fill('[data-testid="start-date"]', '2024-01-01');
     await page.fill('[data-testid="end-date"]', '2024-01-31');
     await page.click('[data-testid="search-button"]');
@@ -44,7 +44,7 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-105
-  test("申請書類番号で完全一致検索ができる", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 申請書類番号で完全一致検索ができる", async ({ page }) => {
     await page.fill('[data-testid="document-number"]', 'APP-2024-001');
     await page.click('[data-testid="search-button"]');
 
@@ -53,9 +53,10 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-106
-  test("文書種別で絞り込み検索ができる", async ({ page }) => {
-    const documentType = page.locator('[data-testid="document-type"]');
-    await documentType.selectOption('稟議書');
+  test("[normal] 承認履歴・通知履歴照会画面 - 文書種別で絞り込み検索ができる", async ({ page }) => {
+    const documentTypeSelect = page.locator('[data-testid="document-type"]');
+    await documentTypeSelect.click();
+    await page.getByText('稟議書').click();
     await page.click('[data-testid="search-button"]');
 
     const historyList = page.locator('[data-testid="history-list"]');
@@ -63,7 +64,7 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-107
-  test("承認者名で部分一致検索ができる", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 承認者名で部分一致検索ができる", async ({ page }) => {
     await page.fill('[data-testid="approver-name"]', '田中');
     await page.click('[data-testid="search-button"]');
 
@@ -72,45 +73,41 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-108
-  test("処理状況フィルターで絞り込みができる", async ({ page }) => {
-    const approvalStatus = page.locator('[data-testid="approval-status"]');
+  test("[normal] 承認履歴・通知履歴照会画面 - 処理状況フィルターで絞り込みができる", async ({ page }) => {
+    const approvalStatusSelect = page.locator('[data-testid="approval-status"]');
     
-    await approvalStatus.selectOption('承認済み');
+    await approvalStatusSelect.selectOption('承認待ち');
     await page.click('[data-testid="search-button"]');
-    const historyList = page.locator('[data-testid="history-list"]');
-    await expect(historyList).toBeVisible();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
-    await approvalStatus.selectOption('否認');
+    await approvalStatusSelect.selectOption('承認済み');
     await page.click('[data-testid="search-button"]');
-    await expect(historyList).toBeVisible();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
-    await approvalStatus.selectOption('保留中');
+    await approvalStatusSelect.selectOption('却下');
     await page.click('[data-testid="search-button"]');
-    await expect(historyList).toBeVisible();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
   });
 
   // SCEN-109
-  test("通知種別フィルターで絞り込みができる", async ({ page }) => {
-    const notificationTab = page.locator('[data-testid="notification-tab"]');
-    await notificationTab.click();
+  test("[normal] 承認履歴・通知履歴照会画面 - 通知種別フィルターで絞り込みができる", async ({ page }) => {
+    await page.locator('[data-testid="notification-tab"]').click();
 
-    const notificationType = page.locator('[data-testid="notification-type"]');
-    await notificationType.selectOption('承認依頼');
+    const notificationTypeSelect = page.locator('[data-testid="notification-type"]');
+    await notificationTypeSelect.selectOption('承認依頼');
     await page.click('[data-testid="search-button"]');
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
-    const historyList = page.locator('[data-testid="history-list"]');
-    await expect(historyList).toBeVisible();
-
-    await notificationType.selectOption('差戻し');
+    await notificationTypeSelect.selectOption('差し戻し');
     await page.click('[data-testid="search-button"]');
-    await expect(historyList).toBeVisible();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
   });
 
   // SCEN-110
-  test("複数条件を組み合わせた検索ができる", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 複数条件を組み合わせた検索ができる", async ({ page }) => {
+    await page.locator('[data-testid="document-type"]').selectOption('稟議書');
     await page.fill('[data-testid="start-date"]', '2024-01-01');
     await page.fill('[data-testid="end-date"]', '2024-01-31');
-    await page.locator('[data-testid="document-type"]').selectOption('稟議書');
     await page.locator('[data-testid="approval-status"]').selectOption('承認済み');
     await page.fill('[data-testid="approver-name"]', '田中');
     await page.click('[data-testid="search-button"]');
@@ -120,10 +117,10 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-111
-  test("検索条件クリアで全条件がリセットされる", async ({ page }) => {
+  test("[normal] 承認履歴・通知履歴照会画面 - 検索条件クリアで全条件がリセットされる", async ({ page }) => {
     await page.fill('[data-testid="start-date"]', '2024-01-01');
     await page.fill('[data-testid="end-date"]', '2024-01-31');
-    await page.fill('[data-testid="approver-name"]', 'テスト');
+    await page.fill('[data-testid="approver-name"]', '田中');
     await page.locator('[data-testid="approval-status"]').selectOption('承認済み');
     await page.locator('[data-testid="notification-type"]').selectOption('承認依頼');
 
@@ -135,77 +132,61 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-112
-  test("処理日時ソートで昇順降順切り替えができる", async ({ page }) => {
-    const historyTable = page.locator('#history-tbody');
-    await expect(historyTable).toBeVisible();
+  test("[normal] 承認履歴・通知履歴照会画面 - 処理日時ソートで昇順降順切り替えができる", async ({ page }) => {
+    const processTimeHeader = page.locator('th').filter({ hasText: '処理日時' });
 
-    const processDateHeader = page.locator('th').filter({ hasText: '処理日時' });
-    await processDateHeader.click();
-    await expect(historyTable).toBeVisible();
+    await processTimeHeader.click();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
-    await processDateHeader.click();
-    await expect(historyTable).toBeVisible();
+    await processTimeHeader.click();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
-    await processDateHeader.click();
-    await expect(historyTable).toBeVisible();
+    await processTimeHeader.click();
+    await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
   });
 
   // SCEN-113
-  test("詳細表示リンクで詳細画面に遷移する", async ({ page }) => {
-    await page.click('[data-testid="search-button"]');
-    
-    const historyList = page.locator('[data-testid="history-list"]');
-    await expect(historyList).toBeVisible();
-
+  test("[normal] 承認履歴・通知履歴照会画面 - 詳細表示リンクで詳細画面に遷移する", async ({ page }) => {
     const detailLink = page.locator('a').filter({ hasText: '詳細' }).first();
-    if (await detailLink.count() > 0) {
-      await detailLink.click();
-      await expect(page).toHaveURL(/\/panels\/.*\.html/);
-    }
+    await detailLink.click();
+
+    await expect(page).toHaveURL(/\/panels\//);
   });
 
   // SCEN-114
-  test("開始日が終了日より後の日付でエラー表示", async ({ page }) => {
+  test("[error] 承認履歴・通知履歴照会画面 - 開始日が終了日より後の日付でエラー表示", async ({ page }) => {
     await page.fill('[data-testid="start-date"]', '2024-01-31');
     await page.fill('[data-testid="end-date"]', '2024-01-15');
     await page.click('[data-testid="search-button"]');
 
-    const errorMessage = page.locator('.error-message, .alert-danger');
-    await expect(errorMessage).toBeVisible();
-    await expect(errorMessage).toContainText('開始日');
+    await expect(page.locator('text=開始日が終了日より後')).toBeVisible();
   });
 
   // SCEN-115
-  test("存在しない申請書類番号で検索結果0件", async ({ page }) => {
+  test("[error] 承認履歴・通知履歴照会画面 - 存在しない申請書類番号で検索結果0件", async ({ page }) => {
     await page.fill('[data-testid="document-number"]', '99999999');
     await page.click('[data-testid="search-button"]');
 
-    const noResultMessage = page.locator('.no-results, .empty-state');
-    await expect(noResultMessage).toBeVisible();
-    await expect(noResultMessage).toContainText('該当する');
+    await expect(page.locator('text=該当する申請書類が見つかりません')).toBeVisible();
   });
 
   // SCEN-116
-  test("無効な文字を含む申請書類番号でエラー表示", async ({ page }) => {
+  test("[error] 承認履歴・通知履歴照会画面 - 無効な文字を含む申請書類番号でエラー表示", async ({ page }) => {
     await page.fill('[data-testid="document-number"]', '!@#$%^&*()');
     await page.click('[data-testid="search-button"]');
 
-    const errorMessage = page.locator('.error-message, .alert-danger');
-    await expect(errorMessage).toBeVisible();
-    await expect(errorMessage).toContainText('有効な');
+    await expect(page.locator('text=有効な申請書類番号を入力してください')).toBeVisible();
   });
 
   // SCEN-117
-  test("検索条件未入力で検索実行時にバリデーション", async ({ page }) => {
+  test("[error] 承認履歴・通知履歴照会画面 - 検索条件未入力で検索実行時にバリデーション", async ({ page }) => {
     await page.click('[data-testid="search-button"]');
 
-    const validationMessage = page.locator('.validation-error, .alert-warning');
-    await expect(validationMessage).toBeVisible();
-    await expect(validationMessage).toContainText('検索条件');
+    await expect(page.locator('text=検索条件を入力してください')).toBeVisible();
   });
 
   // SCEN-118
-  test("期間指定の上限値での検索", async ({ page }) => {
+  test("[edge] 承認履歴・通知履歴照会画面 - 期間指定の上限値での検索", async ({ page }) => {
     await page.fill('[data-testid="start-date"]', '2099-12-31');
     await page.fill('[data-testid="end-date"]', '2099-12-31');
     await page.click('[data-testid="search-button"]');
@@ -215,26 +196,25 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-119
-  test("申請書類番号の最大文字数での検索", async ({ page }) => {
-    const maxLengthValue = 'A'.repeat(255);
-    await page.fill('[data-testid="document-number"]', maxLengthValue);
+  test("[edge] 承認履歴・通知履歴照会画面 - 申請書類番号の最大文字数での検索", async ({ page }) => {
+    const maxLengthString = 'A'.repeat(255);
+    await page.fill('[data-testid="document-number"]', maxLengthString);
     await page.click('[data-testid="search-button"]');
 
     const historyList = page.locator('[data-testid="history-list"]');
     await expect(historyList).toBeVisible();
 
-    const overMaxLengthValue = 'A'.repeat(256);
-    await page.fill('[data-testid="document-number"]', overMaxLengthValue);
+    const overMaxLengthString = 'A'.repeat(256);
+    await page.fill('[data-testid="document-number"]', overMaxLengthString);
     await page.click('[data-testid="search-button"]');
 
-    const errorMessage = page.locator('.error-message, .alert-danger');
-    await expect(errorMessage).toBeVisible();
+    await expect(page.locator('text=文字数制限を超えています')).toBeVisible();
   });
 
   // SCEN-120
-  test("承認者名の最大文字数での検索", async ({ page }) => {
-    const maxLengthName = 'あ'.repeat(255);
-    await page.fill('[data-testid="approver-name"]', maxLengthName);
+  test("[edge] 承認履歴・通知履歴照会画面 - 承認者名の最大文字数での検索", async ({ page }) => {
+    const maxLengthString = 'あ'.repeat(255);
+    await page.fill('[data-testid="approver-name"]', maxLengthString);
     await page.click('[data-testid="search-button"]');
 
     const historyList = page.locator('[data-testid="history-list"]');
@@ -242,20 +222,22 @@ test.describe("承認履歴・通知履歴照会画面", () => {
   });
 
   // SCEN-121
-  test("検索結果が最大表示件数の場合の表示", async ({ page }) => {
+  test("[edge] 承認履歴・通知履歴照会画面 - 検索結果が最大表示件数の場合の表示", async ({ page }) => {
+    await page.fill('[data-testid="start-date"]', '2020-01-01');
+    await page.fill('[data-testid="end-date"]', '2024-12-31');
     await page.click('[data-testid="search-button"]');
 
     const historyList = page.locator('[data-testid="history-list"]');
     await expect(historyList).toBeVisible();
 
-    const pagination = page.locator('.pagination, .pager');
-    if (await pagination.count() > 0) {
-      await expect(pagination).toBeVisible();
+    const paginationControls = page.locator('.pagination, [data-testid*="pagination"], button:has-text("次のページ")').first();
+    if (await paginationControls.isVisible()) {
+      await expect(paginationControls).toBeVisible();
     }
 
-    const maxCountMessage = page.locator('.max-results-warning');
-    if (await maxCountMessage.count() > 0) {
-      await expect(maxCountMessage).toBeVisible();
+    const maxResultMessage = page.locator('text=最大表示件数, text=件数制限').first();
+    if (await maxResultMessage.isVisible()) {
+      await expect(maxResultMessage).toBeVisible();
     }
   });
 });

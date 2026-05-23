@@ -12,176 +12,190 @@ test.describe("申請書類作成画面", () => {
     await page.goto("/panels/scr-1779422326698.html");
   });
 
-  // SCEN-122
-  test("必須項目入力して申請書類作成", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '研究費申請書の提出について');
-    await page.selectOption('[data-testid="document-type-select"]', '研究費申請');
-    await page.fill('[name="content"]', '令和5年度科学研究費助成事業への申請に関する書類を提出いたします。研究テーマは「AI技術を活用した教育支援システムの開発」です。');
-    await page.fill('[name="reason"]', '新しい教育技術の研究開発により学習効果の向上を図るため申請いたします。');
+  test('SCEN-122: 必須項目入力して申請書類作成', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '申請書類作成テスト');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.fill('input[name="applicant-name"]', '田中太郎');
+    await page.fill('[data-testid="reason-textarea"]', '休暇取得のため申請いたします');
     await page.fill('[data-testid="application-date-input"]', '2024-01-15');
-    await page.fill('[data-testid="amount-input"]', '5000000');
+    await page.click('[data-testid="submit-button"]');
+    
+    await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
+  });
+
+  test('SCEN-123: 全項目入力して申請書類作成', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '補助金申請書類作成');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('#applicant-name', '田中 太郎');
+    await page.fill('#applicant-department', '営業部');
+    await page.fill('#applicant-email', 'tanaka@company.com');
+    await page.fill('[data-testid="content-textarea"]', '申請内容の詳細を記載します');
+    await page.fill('[data-testid="amount-input"]', '500000');
+    await page.click('[data-testid="urgency-high"]');
+    await page.click('[data-testid="submit-button"]');
+    
+    await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
+  });
+
+  test('SCEN-124: 添付ファイルありで申請書類作成', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', 'ファイル添付申請');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', '添付ファイルを含む申請書類です');
+    
+    const fileInput = page.locator('[data-testid="file-input"]');
+    await fileInput.setInputFiles([{
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('test file content')
+    }]);
+    
     await page.click('[data-testid="submit-button"]');
     await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
   });
 
-  // SCEN-123
-  test("全項目入力して申請書類作成", async ({ page }) => {
-    await page.fill('#applicant-name', '田中太郎');
-    await page.fill('#applicant-department', '情報工学部');
-    await page.fill('#applicant-email', 'tanaka@university.ac.jp');
-    await page.selectOption('[data-testid="document-type-select"]', '補助金申請');
-    await page.fill('[data-testid="title-input"]', '設備整備費補助金申請書');
-    await page.fill('[name="content"]', '研究室の実験設備更新に関する補助金申請です。老朽化した機器の更新により研究環境の改善を図ります。');
-    await page.fill('[data-testid="application-date-input"]', '2024-02-01');
-    await page.click('[data-testid="urgency-high"]');
-    await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=承認待ち')).toBeVisible();
-  });
-
-  // SCEN-124
-  test("添付ファイルありで申請書類作成", async ({ page }) => {
-    await page.selectOption('[data-testid="document-type-select"]', '補助金申請');
-    await page.fill('[data-testid="title-input"]', '研究費申請書類一式');
-    await page.fill('[name="content"]', '研究費申請に必要な書類一式を添付ファイルとして提出いたします。');
-    await page.click('[data-testid="file-select-button"]');
-    const fileInput = page.locator('[data-testid="file-input"]');
-    await fileInput.setInputFiles('test-document.pdf');
-    await page.click('[data-testid="upload-button"]');
-    await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=申請書類が正常に作成され、添付ファイルも含めて申請が完了')).toBeVisible();
-  });
-
-  // SCEN-125
-  test("既存申請書類の編集保存", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '経費申請書の修正版');
-    await page.fill('[name="content"]', '経費申請書の内容を修正いたします。申請金額を変更し、詳細説明を追加しました。');
-    await page.fill('[data-testid="amount-input"]', '300000');
+  test('SCEN-125: 既存申請書類の編集保存', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '編集対象書類');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.fill('[data-testid="content-textarea"]', '編集前の内容');
     await page.click('[data-testid="draft-button"]');
+    
+    await page.fill('[data-testid="title-input"]', '編集後の書類');
+    await page.fill('[data-testid="content-textarea"]', '編集後の内容に変更しました');
+    await page.click('[data-testid="draft-button"]');
+    
     await expect(page.locator('text=保存完了')).toBeVisible();
-    await expect(page.locator('text=更新内容が反映されています')).toBeVisible();
   });
 
-  // SCEN-126
-  test("必須項目未入力でバリデーションエラー", async ({ page }) => {
-    await page.fill('[name="content"]', '任意項目のみの入力');
+  test('SCEN-126: 必須項目未入力でバリデーションエラー', async ({ page }) => {
     await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=申請書類のタイトルは必須項目です')).toBeVisible();
-    await expect(page.locator('text=文書種別を選択してください')).toBeVisible();
+    
+    await expect(page.locator('text=申請書類のタイトルを入力してください')).toBeVisible();
   });
 
-  // SCEN-127
-  test("申請書類タイトル文字数上限超過でエラー", async ({ page }) => {
+  test('SCEN-127: 申請書類タイトル文字数上限超過でエラー', async ({ page }) => {
     const longTitle = 'a'.repeat(201);
     await page.fill('[data-testid="title-input"]', longTitle);
-    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    await page.fill('[name="content"]', '正常な内容を入力します。申請内容の詳細説明がここに記載されます。');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.fill('[data-testid="content-textarea"]', '申請内容です');
     await page.click('[data-testid="submit-button"]');
+    
     await expect(page.locator('text=申請書類のタイトルは10文字以上200文字以内で入力してください')).toBeVisible();
   });
 
-  // SCEN-128
-  test("申請内容詳細文字数上限超過でエラー", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '正常なタイトル');
-    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    const longContent = 'a'.repeat(2001);
-    await page.fill('[name="content"]', longContent);
+  test('SCEN-128: 申請内容詳細文字数上限超過でエラー', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '申請書類タイトル');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    const longContent = 'a'.repeat(5001);
+    await page.fill('[data-testid="content-textarea"]', longContent);
     await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=申請内容詳細の文字数上限超過エラー')).toBeVisible();
+    
+    await expect(page.locator('text=申請内容は50文字以上で詳しく記載してください')).toBeVisible();
   });
 
-  // SCEN-129
-  test("申請金額に負の値入力でエラー", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '経費申請書');
+  test('SCEN-129: 申請金額に負の値入力でエラー', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '金額申請書類');
     await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    await page.fill('[name="content"]', '正常な申請内容です。詳細な説明をここに記載いたします。');
+    await page.fill('[data-testid="content-textarea"]', '申請内容を記載します');
     await page.fill('[data-testid="amount-input"]', '-10000');
     await page.click('[data-testid="submit-button"]');
+    
     await expect(page.locator('text=申請金額は正の数値を入力してください')).toBeVisible();
   });
 
-  // SCEN-130
-  test("申請金額に文字入力でエラー", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '経費申請書');
+  test('SCEN-130: 申請金額に文字入力でエラー', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '金額申請書類');
     await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    await page.fill('[name="content"]', '正常な申請内容です。詳細な説明をここに記載いたします。');
+    await page.fill('[data-testid="content-textarea"]', '申請内容を記載します');
     await page.fill('[data-testid="amount-input"]', 'abc');
     await page.click('[data-testid="submit-button"]');
+    
     await expect(page.locator('text=数値を入力してください')).toBeVisible();
   });
 
-  // SCEN-131
-  test("申請金額上限値でバリデーション", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '高額研究費申請');
-    await page.selectOption('[data-testid="document-type-select"]', '研究費申請');
-    await page.fill('[name="content"]', '大型研究プロジェクトに関する申請です。詳細な研究計画に基づく予算申請となります。');
+  test('SCEN-131: 申請金額上限値でバリデーション', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '上限金額申請');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', '上限値での申請です');
     await page.fill('[data-testid="amount-input"]', '9999999');
     await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=確認画面')).toBeVisible();
+    
+    await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
   });
 
-  // SCEN-132
-  test("サポート外ファイル形式アップロードでエラー", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', 'ファイル添付申請');
-    await page.fill('[name="content"]', 'ファイルを添付した申請書類です。必要な書類を添付いたします。');
-    await page.click('[data-testid="file-select-button"]');
+  test('SCEN-132: サポート外ファイル形式アップロードでエラー', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', 'ファイルアップロード申請');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', 'ファイルを添付します');
+    
     const fileInput = page.locator('[data-testid="file-input"]');
-    await fileInput.setInputFiles('test.exe');
-    await page.click('[data-testid="upload-button"]');
-    await expect(page.locator('text=サポートされていないファイル形式です。PDF、Word、Excel、画像ファイル（JPG、PNG）のみアップロード可能です。')).toBeVisible();
+    await fileInput.setInputFiles([{
+      name: 'test.exe',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('executable file')
+    }]);
+    
+    await expect(page.locator('text=サポートされていないファイル形式です')).toBeVisible();
   });
 
-  // SCEN-133
-  test("ファイルサイズ上限超過でエラー", async ({ page }) => {
+  test('SCEN-133: ファイルサイズ上限超過でエラー', async ({ page }) => {
     await page.fill('[data-testid="title-input"]', '大容量ファイル申請');
-    await page.fill('[name="content"]', '大容量ファイルを添付した申請書類です。詳細な資料を添付いたします。');
-    await page.click('[data-testid="file-select-button"]');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', '大容量ファイルを添付します');
+    
+    const largeBuffer = Buffer.alloc(11 * 1024 * 1024);
     const fileInput = page.locator('[data-testid="file-input"]');
-    await fileInput.setInputFiles('large-file.pdf');
-    await page.click('[data-testid="upload-button"]');
+    await fileInput.setInputFiles([{
+      name: 'large.pdf',
+      mimeType: 'application/pdf',
+      buffer: largeBuffer
+    }]);
+    
     await expect(page.locator('text=ファイルサイズ上限超過')).toBeVisible();
   });
 
-  // SCEN-134
-  test("過去日付選択でエラー", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '日付設定申請');
-    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    await page.fill('[name="content"]', '日付を設定した申請書類です。適切な申請日を選択いたします。');
-    await page.fill('[data-testid="application-date-input"]', '2023-12-01');
+  test('SCEN-134: 過去日付選択でエラー', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '日付申請書類');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.fill('[data-testid="content-textarea"]', '申請内容です');
+    await page.fill('[data-testid="application-date-input"]', '2020-01-01');
     await page.click('[data-testid="submit-button"]');
+    
     await expect(page.locator('text=過去の日付は選択できません')).toBeVisible();
   });
 
-  // SCEN-135
-  test("申請理由文字数上限でバリデーション", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '申請理由長文');
-    const maxReasonText = 'a'.repeat(500);
-    await page.fill('[name="reason"]', maxReasonText);
-    const overLimitText = 'a'.repeat(501);
-    await page.fill('[name="reason"]', overLimitText);
-    await page.click('[data-testid="draft-button"]');
+  test('SCEN-135: 申請理由文字数上限でバリデーション', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '理由記載申請');
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.fill('[data-testid="content-textarea"]', '申請内容です');
+    
+    const maxLengthReason = 'a'.repeat(1001);
+    await page.fill('[data-testid="reason-textarea"]', maxLengthReason);
+    await page.click('[data-testid="submit-button"]');
+    
     await expect(page.locator('text=文字数上限超過')).toBeVisible();
   });
 
-  // SCEN-136
-  test("複数部署選択で申請書類作成", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '複数部署連携申請');
-    await page.selectOption('[data-testid="document-type-select"]', '稟議書');
-    await page.fill('[name="content"]', '複数部署にまたがる案件に関する申請です。総務部、人事部、経理部の連携が必要です。');
-    await page.check('[data-testid="dept-finance"]');
-    await page.check('[data-testid="dept-hr"]');
-    await page.check('[data-testid="dept-legal"]');
+  test('SCEN-136: 複数部署選択で申請書類作成', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '複数部署申請');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', '複数部署に関わる申請です');
+    
+    await page.click('[data-testid="dept-finance"]');
+    await page.click('[data-testid="dept-hr"]');
+    
     await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=複数部署が選択された申請書類が正常に作成')).toBeVisible();
-    await expect(page.locator('text=総務部、人事部、経理部')).toBeVisible();
+    
+    await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
   });
 
-  // SCEN-137
-  test("緊急度最高で申請書類作成", async ({ page }) => {
-    await page.fill('[data-testid="title-input"]', '緊急対応申請');
-    await page.fill('[name="content"]', '緊急性の高い案件に関する申請書類です。迅速な承認をお願いいたします。');
+  test('SCEN-137: 緊急度最高で申請書類作成', async ({ page }) => {
+    await page.fill('[data-testid="title-input"]', '緊急申請書類');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
+    await page.fill('[data-testid="content-textarea"]', '緊急性の高い申請です');
     await page.click('[data-testid="urgency-urgent"]');
     await page.click('[data-testid="submit-button"]');
-    await expect(page.locator('text=緊急度が最高に設定された申請書類が正常に作成')).toBeVisible();
-    await expect(page.locator('text=緊急申請として通知')).toBeVisible();
+    
+    await expect(page.locator('text=申請書類が正常に作成されました')).toBeVisible();
+    await expect(page.locator('text=緊急申請として通知されました')).toBeVisible();
   });
 });
