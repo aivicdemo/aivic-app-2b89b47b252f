@@ -1,57 +1,57 @@
 import { approveRequirementChange } from "../../src/logic/it-1-br-1779263788059-2-2-1";
 
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
-  test("SCEN-501: 変更要件承認処理 - 事務局長による変更要件承認が正常に処理される", () => {
-    // 法令違反リスク高（8以上）の緊急承認ケース
-    const result1 = approveRequirementChange(
-      "文部科学省の補助金申請に関する紙保管要件の変更",
-      "全学的な申請業務に影響するシステム変更が必要",
-      "standard",
-      9
-    );
-    expect(result1).toEqual({
-      approved: true,
-      approvalComment: "法令違反リスク回避のため緊急承認",
-      nextAction: "即座に文書分類基準を更新",
-      urgencyLevel: "緊急"
-    });
+  test("事務局長による変更要件承認が正常に処理される - SCEN-501", () => {
+    // 通常承認: 文部科学省関連で影響分析が軽微、標準権限内
+    const changeRequirements = "文部科学省の補助金申請書類に関する電子保管要件の変更により、研究費申請書類の処理ルートをハイブリッド方式に変更する。";
+    const impactAnalysis = "変更による業務への影響は軽微で、研究推進部と財務課の2部署が対象。システム改修は不要で、運用手順の変更のみで対応可能。";
+    const directorAuthority = "standard";
+    const complianceRisk = 5;
 
-    // 通常承認ケース（権限内かつ補助金関連）
-    const result2 = approveRequirementChange(
-      "文部科学省の補助金書類保管方法の変更について",
-      "影響範囲は限定的で通常の承認プロセスで対応可能な変更",
-      "standard",
-      5
-    );
-    expect(result2).toEqual({
+    const result = approveRequirementChange(changeRequirements, impactAnalysis, directorAuthority, complianceRisk);
+
+    expect(result).toEqual({
       approved: true,
       approvalComment: "通常承認",
       nextAction: "文書分類基準の更新を実施",
       urgencyLevel: "通常"
     });
 
-    // 理事会承認が必要なケース（権限外の大規模変更）
-    const result3 = approveRequirementChange(
-      "全学システムの根本的な変更を伴う法令改正対応",
-      "この変更は1000文字を超える大規模な影響分析が必要で、事務局長の権限を超える内容を含んでいます。全学的なシステム変更とガバナンス体制の見直しが必要となり、理事会レベルでの意思決定が求められます。",
-      "standard",
-      3
-    );
-    expect(result3).toEqual({
+    // 緊急承認: 法令違反リスクが高い場合
+    const urgentChangeRequirements = "文部科学省通知により補助金関連書類の紙保管義務が即日発効。";
+    const urgentImpactAnalysis = "法令違反リスクが高く、即座の対応が必要。";
+    const urgentComplianceRisk = 9;
+
+    const urgentResult = approveRequirementChange(urgentChangeRequirements, urgentImpactAnalysis, directorAuthority, urgentComplianceRisk);
+
+    expect(urgentResult).toEqual({
+      approved: true,
+      approvalComment: "法令違反リスク回避のため緊急承認",
+      nextAction: "即座に文書分類基準を更新",
+      urgencyLevel: "緊急"
+    });
+
+    // 理事会承認が必要: 権限を超える重大変更
+    const majorChangeRequirements = "全学システムの根本的な処理ルート変更が必要。" + "a".repeat(970);
+    const majorImpactAnalysis = "全学規模での処理手順変更が必要で、システム改修と組織変更を伴う大規模な変更となる。" + "b".repeat(850);
+
+    const majorResult = approveRequirementChange(majorChangeRequirements, majorImpactAnalysis, directorAuthority, complianceRisk);
+
+    expect(majorResult).toEqual({
       approved: false,
       approvalComment: "理事会承認が必要",
       nextAction: "理事会への上申準備",
       urgencyLevel: "保留"
     });
 
-    // 変更要件が空の場合のエラーテスト
+    // エラーケース: 変更要件が不十分
     expect(() => {
-      approveRequirementChange("", "影響分析結果", "standard", 5);
+      approveRequirementChange("短い", impactAnalysis, directorAuthority, complianceRisk);
     }).toThrow("変更要件の内容が不十分です。具体的な変更内容を記載してください。");
 
-    // 影響分析結果が提供されていない場合のエラーテスト
+    // エラーケース: 影響分析が未提供
     expect(() => {
-      approveRequirementChange("変更要件内容", "", "standard", 5);
+      approveRequirementChange(changeRequirements, "", directorAuthority, complianceRisk);
     }).toThrow("影響分析が完了していません。承認判定に必要な分析結果を確認してください。");
   });
 });

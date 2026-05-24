@@ -1,20 +1,25 @@
 import { migrateExistingDataToNewClassification } from "../../src/logic/it-1-br-1779263788059-2-1-1";
 
 describe("申請書類の種別を自動判別し適切な処理ルートを決定する機能", () => {
-  test("新しい分類基準に基づいて既存データが適切に再分類される", () => {
+  test("法令改正に基づく新しい分類基準で既存データを再分類し、処理ルートを適切に更新する", () => {
     // SCEN-504
-    
     const newClassificationRules = [
       {
         documentType: "補助金申請書",
-        subsidyKeywords: ["科研費", "運営費交付金", "設備整備費"],
-        moeRequirement: true,
+        subsidyRelatedThreshold: 0.6,
+        paperStorageRequired: true,
         processingRoute: "hybrid"
       },
       {
-        documentType: "一般申請書",
-        subsidyKeywords: [],
-        moeRequirement: false,
+        documentType: "研究費申請書",
+        subsidyRelatedThreshold: 0.7,
+        paperStorageRequired: true,
+        processingRoute: "hybrid"
+      },
+      {
+        documentType: "一般事務申請",
+        subsidyRelatedThreshold: 0.8,
+        paperStorageRequired: false,
         processingRoute: "electronic"
       }
     ];
@@ -22,28 +27,35 @@ describe("申請書類の種別を自動判別し適切な処理ルートを決�
     const existingDocuments = [
       {
         id: "DOC001",
-        title: "科研費申請書類",
-        content: "科学研究費補助金の申請に関する書類",
-        documentType: "一般申請書",
-        current_processing_route: "electronic"
+        title: "科研費研究計画書",
+        documentType: "補助金申請書",
+        current_processing_route: "electronic",
+        subsidyRelated: true
       },
       {
-        id: "DOC002",
-        title: "設備整備費申請",
-        content: "設備整備費補助金の申請書類",
-        documentType: "補助金申請書",
-        current_processing_route: "electronic"
+        id: "DOC002", 
+        title: "設備購入申請書",
+        documentType: "研究費申請書",
+        current_processing_route: "electronic",
+        subsidyRelated: true
       },
       {
         id: "DOC003",
-        title: "人事関連書類",
-        content: "人事に関する一般的な申請書類",
-        documentType: "一般申請書",
-        current_processing_route: "electronic"
+        title: "会議室予約申請",
+        documentType: "一般事務申請",
+        current_processing_route: "electronic",
+        subsidyRelated: false
+      },
+      {
+        id: "DOC004",
+        title: "旅費申請書",
+        documentType: "一般事務申請", 
+        current_processing_route: "hybrid",
+        subsidyRelated: false
       }
     ];
 
-    const migrationScope = "補助金関連";
+    const migrationScope = "all_subsidy_related";
 
     const result = migrateExistingDataToNewClassification(
       newClassificationRules,
@@ -62,7 +74,7 @@ describe("申請書類の種別を自動判別し適切な処理ルートを決�
       },
       {
         documentId: "DOC002",
-        oldRoute: "electronic",
+        oldRoute: "electronic", 
         newRoute: "hybrid"
       }
     ]);

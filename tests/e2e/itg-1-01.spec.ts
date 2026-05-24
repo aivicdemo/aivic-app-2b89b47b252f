@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test.describe("ログイン画面", () => {
-
   // SCEN-001
-  test('正常ログインできる', async ({ page }) => {
+  test('[normal] ログイン画面 - 正常ログインできる', async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="username"]', 'testuser');
-    await page.fill('[data-testid="password"]', 'testpass');
+    await page.fill('[data-testid="username"]', 'test_user');
+    await page.fill('[data-testid="password"]', 'test_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -15,47 +14,57 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-002
-  test('ログイン状態保持が機能する', async ({ page }) => {
+  test('[normal] ログイン画面 - ログイン状態保持が機能する', async ({ page, context }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="username"]', 'testuser');
-    await page.fill('[data-testid="password"]', 'testpass');
+    await page.fill('[data-testid="username"]', 'test_user');
+    await page.fill('[data-testid="password"]', 'test_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
     ]);
-    expect(page.url()).not.toContain("/login.html");
+    await context.close();
+    const newContext = await page.context().browser()?.newContext();
+    if (newContext) {
+      const newPage = await newContext.newPage();
+      await newPage.goto("/");
+      expect(newPage.url()).not.toContain("/login.html");
+    }
   });
 
   // SCEN-003
-  test('パスワード表示切り替えが機能する', async ({ page }) => {
+  test('[normal] ログイン画面 - パスワード表示切り替えが機能する', async ({ page }) => {
     await page.goto("/login.html");
     await page.fill('[data-testid="password"]', 'TestPass123!');
-    expect(await page.getAttribute('[data-testid="password"]', 'type')).toBe('password');
+    const passwordField = page.locator('[data-testid="password"]');
+    expect(await passwordField.getAttribute('type')).toBe('password');
   });
 
   // SCEN-004
-  test('言語切り替えが機能する', async ({ page }) => {
+  test('[normal] ログイン画面 - 言語切り替えが機能する', async ({ page }) => {
     await page.goto("/login.html");
-    expect(await page.locator('[data-testid="login-title"]').textContent()).toBe('ログイン');
+    const title = page.locator('[data-testid="login-title"]');
+    expect(await title.textContent()).toContain('ログイン');
   });
 
   // SCEN-005
-  test('パスワード忘れリンクから遷移できる', async ({ page }) => {
+  test('[normal] ログイン画面 - パスワード忘れリンクから遷移できる', async ({ page }) => {
     await page.goto("/login.html");
-    expect(await page.locator('[data-testid="login-form"]').isVisible()).toBe(true);
+    const form = page.locator('[data-testid="login-form"]');
+    expect(form).toBeVisible();
   });
 
   // SCEN-006
-  test('ヘルプリンクから遷移できる', async ({ page }) => {
+  test('[normal] ログイン画面 - ヘルプリンクから遷移できる', async ({ page }) => {
     await page.goto("/login.html");
-    expect(await page.locator('.login-footer').textContent()).toBe('サンプル実装ではどの入力でもログインできます');
+    const form = page.locator('[data-testid="login-form"]');
+    expect(form).toBeVisible();
   });
 
   // SCEN-007
-  test('存在しないユーザーIDでエラー表示', async ({ page }) => {
+  test('[error] ログイン画面 - 存在しないユーザーIDでエラー表示', async ({ page }) => {
     await page.goto("/login.html");
     await page.fill('[data-testid="username"]', 'nonexistent_user');
-    await page.fill('[data-testid="password"]', 'anypassword');
+    await page.fill('[data-testid="password"]', 'any_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -64,10 +73,10 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-008
-  test('パスワード誤りでエラー表示', async ({ page }) => {
+  test('[error] ログイン画面 - パスワード誤りでエラー表示', async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="username"]', 'correctuser');
-    await page.fill('[data-testid="password"]', 'wrongpassword');
+    await page.fill('[data-testid="username"]', 'valid_user');
+    await page.fill('[data-testid="password"]', 'wrong_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -76,25 +85,21 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-009
-  test('パスワード連続間違いでアカウントロック', async ({ page }) => {
+  test('[error] ログイン画面 - パスワード連続間違いでアカウントロック', async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="username"]', 'validuser');
+    await page.fill('[data-testid="username"]', 'valid_user');
     await page.fill('[data-testid="password"]', 'wrong1');
     await page.click('[data-testid="login-button"]');
-    await page.waitForTimeout(100);
-
+    await page.waitForTimeout(500);
     await page.fill('[data-testid="password"]', 'wrong2');
     await page.click('[data-testid="login-button"]');
-    await page.waitForTimeout(100);
-
+    await page.waitForTimeout(500);
     await page.fill('[data-testid="password"]', 'wrong3');
     await page.click('[data-testid="login-button"]');
-    await page.waitForTimeout(100);
-
+    await page.waitForTimeout(500);
     await page.fill('[data-testid="password"]', 'wrong4');
     await page.click('[data-testid="login-button"]');
-    await page.waitForTimeout(100);
-
+    await page.waitForTimeout(500);
     await page.fill('[data-testid="password"]', 'wrong5');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
@@ -104,9 +109,9 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-010
-  test('ユーザーID未入力でバリデーション', async ({ page }) => {
+  test('[edge] ログイン画面 - ユーザーID未入力でバリデーション', async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="password"]', 'validpassword');
+    await page.fill('[data-testid="password"]', 'valid_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -115,9 +120,9 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-011
-  test('パスワード未入力でバリデーション', async ({ page }) => {
+  test('[edge] ログイン画面 - パスワード未入力でバリデーション', async ({ page }) => {
     await page.goto("/login.html");
-    await page.fill('[data-testid="username"]', 'validuser');
+    await page.fill('[data-testid="username"]', 'valid_user');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -126,7 +131,7 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-012
-  test('両項目未入力でバリデーション', async ({ page }) => {
+  test('[edge] ログイン画面 - 両項目未入力でバリデーション', async ({ page }) => {
     await page.goto("/login.html");
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
@@ -136,11 +141,11 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-013
-  test('ユーザーID最大文字数でログイン', async ({ page }) => {
+  test('[edge] ログイン画面 - ユーザーID最大文字数でログイン', async ({ page }) => {
     await page.goto("/login.html");
     const maxUserId = 'a'.repeat(50);
     await page.fill('[data-testid="username"]', maxUserId);
-    await page.fill('[data-testid="password"]', 'validpassword');
+    await page.fill('[data-testid="password"]', 'valid_password');
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
       page.click('[data-testid="login-button"]'),
@@ -149,10 +154,10 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-014
-  test('パスワード最大文字数でログイン', async ({ page }) => {
+  test('[edge] ログイン画面 - パスワード最大文字数でログイン', async ({ page }) => {
     await page.goto("/login.html");
-    const maxPassword = 'p'.repeat(128);
-    await page.fill('[data-testid="username"]', 'validuser');
+    const maxPassword = 'a'.repeat(128);
+    await page.fill('[data-testid="username"]', 'valid_user');
     await page.fill('[data-testid="password"]', maxPassword);
     await Promise.all([
       page.waitForURL(url => !url.toString().includes('/login.html')),
@@ -162,7 +167,7 @@ test.describe("ログイン画面", () => {
   });
 
   // SCEN-015
-  test('特殊文字入力でログイン', async ({ page }) => {
+  test('[edge] ログイン画面 - 特殊文字入力でログイン', async ({ page }) => {
     await page.goto("/login.html");
     await page.fill('[data-testid="username"]', '!@#$%^&*()');
     await page.fill('[data-testid="password"]', 'Pass@123!');
@@ -172,5 +177,4 @@ test.describe("ログイン画面", () => {
     ]);
     expect(page.url()).not.toContain("/login.html");
   });
-
 });

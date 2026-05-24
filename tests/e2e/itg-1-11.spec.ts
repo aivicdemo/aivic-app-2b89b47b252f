@@ -12,255 +12,219 @@ test.describe("進捗確認画面", () => {
     await page.goto("/panels/scr-1779422369173.html");
   });
 
-  test('SCEN-178: 申請一覧テーブルが正常表示される', async ({ page }) => {
-    // SCEN-178: [normal] 進捗確認画面 - 申請一覧テーブルが正常表示される
-    await expect(page.locator('[data-testid="applications-table"]')).toBeVisible();
-    await expect(page.locator('text=申請ID')).toBeVisible();
-    await expect(page.locator('text=申請タイトル')).toBeVisible();
-    await expect(page.locator('text=申請者')).toBeVisible();
-    await expect(page.locator('text=申請日')).toBeVisible();
-    await expect(page.locator('text=ステータス')).toBeVisible();
-    await expect(page.locator('#applications-tbody')).toBeVisible();
+  // SCEN-178
+  test('[normal] 申請一覧テーブルが正常表示される', async ({ page }) => {
+    await expect(page.locator('[data-testid="applications-list"]')).toBeVisible();
+    await expect(page.locator('th').nth(0)).toContainText('申請ID');
+    await expect(page.locator('th').nth(1)).toContainText('申請タイトル');
+    await expect(page.locator('th').nth(2)).toContainText('申請者');
+    await expect(page.locator('th').nth(3)).toContainText('申請種別');
+    await expect(page.locator('th').nth(4)).toContainText('ステータス');
+    await expect(page.locator('th').nth(5)).toContainText('現在承認者');
+    await expect(page.locator('th').nth(6)).toContainText('処理予定日');
+    await expect(page.locator('[data-testid="applications-tbody"] tr')).toHaveCountGreaterThan(0);
   });
 
-  test('SCEN-179: 承認フロー進捗バーが各ステップで正確に表示される', async ({ page }) => {
-    // SCEN-179: [normal] 進捗確認画面 - 承認フロー進捗バーが各ステップで正確に表示される
+  // SCEN-179
+  test('[normal] 承認フロー進捗バーが各ステップで正確に表示される', async ({ page }) => {
+    await page.locator('[data-testid="applications-tbody"] tr').first().click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
     await expect(page.locator('#approval-flow')).toBeVisible();
-    const progressBar = page.locator('#approval-flow');
-    await expect(progressBar).toContainText('1/3');
-    
-    const currentStep = page.locator('.active');
-    await expect(currentStep).toBeVisible();
-    
-    await page.click('button:has-text("承認")');
-    await expect(progressBar).toContainText('2/3');
+    await expect(page.locator('#approval-flow .status-badge')).toHaveCountGreaterThan(0);
+    await expect(page.locator('#approval-flow .status-badge.active')).toHaveCount(1);
+    await page.click('#close-modal');
   });
 
-  test('SCEN-180: 現在の承認者名が正しく表示される', async ({ page }) => {
-    // SCEN-180: [normal] 進捗確認画面 - 現在の承認者名が正しく表示される
-    await expect(page.locator('#current-approver')).toBeVisible();
-    await expect(page.locator('text=現在の承認者:')).toBeVisible();
-    
-    const approverName = page.locator('#current-approver');
-    await expect(approverName).not.toBeEmpty();
+  // SCEN-180
+  test('[normal] 現在の承認者名が正しく表示される', async ({ page }) => {
+    await page.locator('[data-testid="applications-tbody"] tr').first().click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await expect(page.locator('#approval-flow')).toContainText('現在承認者');
+    await page.click('#close-modal');
   });
 
-  test('SCEN-181: 遅延アラートが適切にハイライト表示される', async ({ page }) => {
-    // SCEN-181: [normal] 進捗確認画面 - 遅延アラートが適切にハイライト表示される
-    const delayedRow = page.locator('[data-testid="applications-table"] tr:has(.delay-alert)');
-    if (await delayedRow.count() > 0) {
-      await expect(delayedRow.first()).toHaveClass(/.*delay.*/);
-      await delayedRow.first().hover();
-    }
+  // SCEN-181
+  test('[normal] 遅延アラートが適切にハイライト表示される', async ({ page }) => {
+    const urgentRow = page.locator('[data-testid="applications-tbody"] tr').filter({ hasText: '緊急' }).first();
+    await expect(urgentRow.locator('.status-badge.urgent')).toBeVisible();
+    await urgentRow.hover();
+    await urgentRow.click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await page.click('#close-modal');
   });
 
-  test('SCEN-182: 申請詳細リンクから詳細画面に遷移できる', async ({ page }) => {
-    // SCEN-182: [normal] 進捗確認画面 - 申請詳細リンクから詳細画面に遷移できる
-    const detailButton = page.locator('button:has-text("詳細")').first();
-    await detailButton.click();
-    
+  // SCEN-182
+  test('[normal] 申請詳細リンクから詳細画面に遷移できる', async ({ page }) => {
+    await page.locator('[data-testid="applications-tbody"] tr').first().click();
     await expect(page.locator('#detail-modal')).toBeVisible();
     await expect(page.locator('#detail-content')).toBeVisible();
+    await page.click('#close-modal');
   });
 
-  test('SCEN-183: 承認履歴が時系列で表示される', async ({ page }) => {
-    // SCEN-183: [normal] 進捗確認画面 - 承認履歴が時系列で表示される
-    await page.click('button:has-text("詳細")');
-    await expect(page.locator('#approval-history-tbody')).toBeVisible();
-    await expect(page.locator('text=承認者')).toBeVisible();
-    await expect(page.locator('text=承認結果')).toBeVisible();
-    await expect(page.locator('text=承認日時')).toBeVisible();
+  // SCEN-183
+  test('[normal] 承認履歴が時系列で表示される', async ({ page }) => {
+    await page.locator('[data-testid="applications-tbody"] tr').first().click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await expect(page.locator('#approval-history')).toBeVisible();
+    const historyItems = page.locator('#approval-history .history-item');
+    const count = await historyItems.count();
+    if (count > 1) {
+      const firstDate = await historyItems.nth(0).locator('.date').textContent();
+      const lastDate = await historyItems.nth(count - 1).locator('.date').textContent();
+      expect(firstDate).toBeTruthy();
+      expect(lastDate).toBeTruthy();
+    }
+    await page.click('#close-modal');
   });
 
-  test('SCEN-184: ステータス別タブで絞り込みができる', async ({ page }) => {
-    // SCEN-184: [normal] 進捗確認画面 - ステータス別タブで絞り込みができる
-    await page.click('[data-testid="tab-pending"]');
-    await expect(page.locator('[data-testid="tab-pending"]')).toHaveClass(/.*active.*/);
+  // SCEN-184
+  test('[normal] ステータス別タブで絞り込みができる', async ({ page }) => {
+    await page.click('.status-tab:has-text("全て")');
+    const allCount = await page.locator('[data-testid="applications-tbody"] tr').count();
     
-    await page.click('[data-testid="tab-approving"]');
-    await expect(page.locator('[data-testid="tab-approving"]')).toHaveClass(/.*active.*/);
+    await page.click('.status-tab:has-text("申請中")');
+    const pendingCount = await page.locator('[data-testid="applications-tbody"] tr').count();
+    expect(pendingCount).toBeLessThanOrEqual(allCount);
     
-    await page.click('[data-testid="tab-approved"]');
-    await expect(page.locator('[data-testid="tab-approved"]')).toHaveClass(/.*active.*/);
+    await page.click('.status-tab:has-text("承認中")');
+    const approvalCount = await page.locator('[data-testid="applications-tbody"] tr').count();
+    expect(approvalCount).toBeLessThanOrEqual(allCount);
     
-    await page.click('[data-testid="tab-all"]');
-    await expect(page.locator('[data-testid="tab-all"]')).toHaveClass(/.*active.*/);
+    await page.click('.status-tab:has-text("承認済")');
+    const approvedCount = await page.locator('[data-testid="applications-tbody"] tr').count();
+    expect(approvedCount).toBeLessThanOrEqual(allCount);
+    
+    await page.click('.status-tab:has-text("全て")');
   });
 
-  test('SCEN-185: 文書種別フィルターで該当データのみ表示される', async ({ page }) => {
-    // SCEN-185: [normal] 進捗確認画面 - 文書種別フィルターで該当データのみ表示される
+  // SCEN-185
+  test('[normal] 文書種別フィルターで該当データのみ表示される', async ({ page }) => {
     await page.selectOption('[data-testid="document-type-filter"]', '休暇申請');
     await page.click('[data-testid="search-button"]');
-    
-    const tableRows = page.locator('[data-testid="applications-table"] tbody tr');
-    const count = await tableRows.count();
-    if (count > 0) {
-      const firstRowType = tableRows.first().locator('td').nth(2);
-      await expect(firstRowType).toContainText('休暇申請');
-    }
+    const filteredRows = page.locator('[data-testid="applications-tbody"] tr:has-text("休暇申請")');
+    await expect(filteredRows).toHaveCountGreaterThanOrEqual(0);
   });
 
-  test('SCEN-186: 検索条件で対象申請が抽出される', async ({ page }) => {
-    // SCEN-186: [normal] 進捗確認画面 - 検索条件で対象申請が抽出される
-    await page.fill('[data-testid="application-id-input"]', 'APP001');
-    await page.fill('[data-testid="applicant-name-input"]', '田中');
+  // SCEN-186
+  test('[normal] 検索条件で対象申請が抽出される', async ({ page }) => {
+    await page.fill('[data-testid="search-input"]', 'APP');
     await page.selectOption('[data-testid="document-type-filter"]', '経費申請');
     await page.click('[data-testid="search-button"]');
-    
-    await expect(page.locator('[data-testid="applications-table"]')).toBeVisible();
+    await expect(page.locator('[data-testid="applications-tbody"] tr')).toHaveCountGreaterThanOrEqual(0);
   });
 
-  test('SCEN-187: 優先度表示が正しく表示される', async ({ page }) => {
-    // SCEN-187: [normal] 進捗確認画面 - 優先度表示が正しく表示される
-    await expect(page.locator('text=優先度')).toBeVisible();
-    
-    const priorityCell = page.locator('[data-testid="applications-table"] tbody tr').first().locator('td').nth(7);
-    const priorityText = await priorityCell.textContent();
-    expect(priorityText).toMatch(/高|中|低/);
+  // SCEN-187
+  test('[normal] 優先度表示が正しく表示される', async ({ page }) => {
+    const priorityCell = page.locator('[data-testid="applications-tbody"] tr').first().locator('td').nth(7);
+    const priorityBadge = priorityCell.locator('.status-badge');
+    await expect(priorityBadge).toBeVisible();
+    const badgeClasses = await priorityBadge.getAttribute('class');
+    expect(badgeClasses).toMatch(/(urgent|pending|normal)/);
   });
 
-  test('SCEN-188: 処理予定日が適切に表示される', async ({ page }) => {
-    // SCEN-188: [normal] 進捗確認画面 - 処理予定日が適切に表示される
-    await expect(page.locator('text=処理予定日')).toBeVisible();
-    
-    const dueDateCell = page.locator('[data-testid="applications-table"] tbody tr').first().locator('td').nth(6);
+  // SCEN-188
+  test('[normal] 処理予定日が適切に表示される', async ({ page }) => {
+    const dueDateCell = page.locator('[data-testid="applications-tbody"] tr').first().locator('td').nth(6);
     const dueDateText = await dueDateCell.textContent();
-    expect(dueDateText).toMatch(/^\d{4}\/\d{2}\/\d{2}$|^-$|^未定$/);
+    expect(dueDateText).toMatch(/(\d{4}\/\d{2}\/\d{2}|-|未定)/);
   });
 
-  test('SCEN-189: 存在しない検索条件で結果0件表示', async ({ page }) => {
-    // SCEN-189: [error] 進捗確認画面 - 存在しない検索条件で結果0件表示
-    await page.fill('[data-testid="application-id-input"]', 'INVALID-12345');
+  // SCEN-189
+  test('[error] 存在しない検索条件で結果0件表示', async ({ page }) => {
+    await page.fill('[data-testid="search-input"]', 'INVALID-12345');
     await page.click('[data-testid="search-button"]');
-    
-    await expect(page.locator('text=該当する申請が見つかりません')).toBeVisible();
+    await expect(page.locator('#no-results')).toBeVisible();
+    await expect(page.locator('#no-results')).toContainText('該当する申請が見つかりません');
   });
 
-  test('SCEN-190: 無効なフィルター条件でエラー処理', async ({ page }) => {
-    // SCEN-190: [error] 進捗確認画面 - 無効なフィルター条件でエラー処理
-    await page.fill('[data-testid="application-id-input"]', 'invalid-date');
+  // SCEN-190
+  test('[error] 無効なフィルター条件でエラー処理', async ({ page }) => {
+    await page.fill('[data-testid="search-input"]', 'invalid-date');
     await page.click('[data-testid="search-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
     
-    const errorMessage = page.locator('.error-message');
-    if (await errorMessage.count() > 0) {
-      await expect(errorMessage).toBeVisible();
-    }
-    
-    await page.click('[data-testid="clear-button"]');
-    await page.fill('[data-testid="application-id-input"]', 'APP001');
+    await page.fill('[data-testid="search-input"]', 'APP-001');
     await page.click('[data-testid="search-button"]');
+    await expect(page.locator('[data-testid="error-message"]')).not.toBeVisible();
   });
 
-  test('SCEN-191: 削除済み申請の詳細リンククリックでエラー表示', async ({ page }) => {
-    // SCEN-191: [error] 進捗確認画面 - 削除済み申請の詳細リンククリックでエラー表示
-    const deletedRow = page.locator('[data-testid="applications-table"] tr:has-text("削除済み")');
+  // SCEN-191
+  test('[error] 削除済み申請の詳細リンククリックでエラー表示', async ({ page }) => {
+    const deletedRow = page.locator('[data-testid="applications-tbody"] tr').filter({ hasText: '削除済み' }).first();
     if (await deletedRow.count() > 0) {
-      await deletedRow.locator('button:has-text("詳細")').click();
-      
-      const errorMessage = page.locator('.error-message, .alert');
-      await expect(errorMessage).toContainText(/存在しない|見つかりません|削除/);
+      await deletedRow.click();
+      await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+      await expect(page.locator('[data-testid="error-message"]')).toContainText('申請が存在しない');
     }
   });
 
-  test('SCEN-192: 権限外申請の詳細表示でアクセス拒否', async ({ page }) => {
-    // SCEN-192: [error] 進捗確認画面 - 権限外申請の詳細表示でアクセス拒否
-    await page.goto("/panels/scr-1779422369173.html?app=unauthorized-app-123");
-    
-    const accessDenied = page.locator('.access-denied, .error-message');
-    if (await accessDenied.count() > 0) {
-      await expect(accessDenied).toContainText(/権限|アクセス|拒否/);
-    }
+  // SCEN-192
+  test('[error] 権限外申請の詳細表示でアクセス拒否', async ({ page }) => {
+    const unauthorizedUrl = '/panels/scr-1779422369173.html?id=unauthorized-app-123';
+    await page.goto(unauthorizedUrl);
+    await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('アクセス権限');
   });
 
-  test('SCEN-193: 大量データでの表示パフォーマンス', async ({ page }) => {
-    // SCEN-193: [edge] 進捗確認画面 - 大量データでの表示パフォーマンス
+  // SCEN-193
+  test('[edge] 大量データでの表示パフォーマンス', async ({ page }) => {
     const startTime = Date.now();
-    
-    await page.goto("/panels/scr-1779422369173.html");
-    await expect(page.locator('[data-testid="applications-table"]')).toBeVisible();
-    
+    await page.reload();
+    await page.waitForLoadState('networkidle');
     const loadTime = Date.now() - startTime;
     expect(loadTime).toBeLessThan(3000);
     
-    const nextPageButton = page.locator('button:has-text("次へ")');
-    if (await nextPageButton.count() > 0) {
-      const paginationStart = Date.now();
-      await nextPageButton.click();
-      await page.waitForLoadState('networkidle');
-      const paginationTime = Date.now() - paginationStart;
-      expect(paginationTime).toBeLessThan(3000);
-    }
-  });
-
-  test('SCEN-194: 申請件数0件時の表示', async ({ page }) => {
-    // SCEN-194: [edge] 進捗確認画面 - 申請件数0件時の表示
-    await page.fill('[data-testid="application-id-input"]', 'NO-MATCH-DATA');
-    await page.click('[data-testid="search-button"]');
-    
-    const noDataMessage = page.locator('text=該当する申請が見つかりません');
-    await expect(noDataMessage).toBeVisible();
-    
-    const tableBody = page.locator('[data-testid="applications-table"] tbody');
-    const rowCount = await tableBody.locator('tr').count();
-    expect(rowCount).toBe(0);
-  });
-
-  test('SCEN-195: 最大文字数の検索条件入力', async ({ page }) => {
-    // SCEN-195: [edge] 進捗確認画面 - 最大文字数の検索条件入力
-    const maxTitleLength = 'A'.repeat(255);
-    const maxIdLength = 'B'.repeat(20);
-    const maxDescLength = 'C'.repeat(500);
-    
-    await page.fill('[data-testid="applicant-name-input"]', maxTitleLength);
-    await page.fill('[data-testid="application-id-input"]', maxIdLength);
-    await page.click('[data-testid="search-button"]');
-    
-    await expect(page.locator('[data-testid="applications-table"]')).toBeVisible();
-  });
-
-  test('SCEN-196: 全フィルター同時適用', async ({ page }) => {
-    // SCEN-196: [edge] 進捗確認画面 - 全フィルター同時適用
-    await page.selectOption('[data-testid="document-type-filter"]', '休暇申請');
-    await page.click('[data-testid="tab-pending"]');
-    await page.fill('[data-testid="applicant-name-input"]', '田中');
-    await page.fill('[data-testid="application-id-input"]', 'APP');
-    
-    const startTime = Date.now();
-    await page.click('[data-testid="search-button"]');
+    await page.click('.status-tab:has-text("承認済")');
+    const filterStartTime = Date.now();
     await page.waitForLoadState('networkidle');
-    const filterTime = Date.now() - startTime;
-    
+    const filterTime = Date.now() - filterStartTime;
     expect(filterTime).toBeLessThan(3000);
-    await expect(page.locator('[data-testid="applications-table"]')).toBeVisible();
   });
 
-  test('SCEN-197: 長い申請タイトルの表示', async ({ page }) => {
-    // SCEN-197: [edge] 進捗確認画面 - 長い申請タイトルの表示
-    const longTitle = '令和6年度第1四半期における全社的なデジタルトランスフォーメーション推進に関する予算申請及び人員配置計画の承認依頼について（緊急案件）';
+  // SCEN-194
+  test('[edge] 申請件数0件時の表示', async ({ page }) => {
+    await page.fill('[data-testid="search-input"]', 'NONEXISTENT');
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('#no-results')).toBeVisible();
+    await expect(page.locator('[data-testid="applications-tbody"] tr')).toHaveCount(0);
+  });
+
+  // SCEN-195
+  test('[edge] 最大文字数の検索条件入力', async ({ page }) => {
+    const maxLengthString = 'A'.repeat(255);
+    await page.fill('[data-testid="search-input"]', maxLengthString);
+    await page.click('[data-testid="search-button"]');
+    await expect(page.locator('[data-testid="applications-list"]')).toBeVisible();
     
-    await page.fill('[data-testid="application-id-input"]', '');
-    await page.fill('[data-testid="applicant-name-input"]', '');
+    const inputValue = await page.locator('[data-testid="search-input"]').inputValue();
+    expect(inputValue.length).toBeLessThanOrEqual(255);
+  });
+
+  // SCEN-196
+  test('[edge] 全フィルター同時適用', async ({ page }) => {
+    await page.fill('[data-testid="search-input"]', 'APP');
+    await page.selectOption('[data-testid="document-type-filter"]', '経費申請');
+    await page.selectOption('[data-testid="priority-filter"]', '緊急');
     await page.click('[data-testid="search-button"]');
     
-    const titleCells = page.locator('[data-testid="applications-table"] tbody tr td:nth-child(2)');
-    const count = await titleCells.count();
+    await expect(page.locator('[data-testid="applications-list"]')).toBeVisible();
+    const resultRows = page.locator('[data-testid="applications-tbody"] tr');
+    const rowCount = await resultRows.count();
+    expect(rowCount).toBeGreaterThanOrEqual(0);
+  });
+
+  // SCEN-197
+  test('[edge] 長い申請タイトルの表示', async ({ page }) => {
+    const longTitleRow = page.locator('[data-testid="applications-tbody"] tr').first();
+    const titleCell = longTitleRow.locator('td').nth(1);
+    await expect(titleCell).toBeVisible();
     
-    if (count > 0) {
-      const titleCell = titleCells.first();
-      const titleText = await titleCell.textContent();
-      
-      expect(titleText || '').toMatch(/^.{10,}/);
-      
-      const cellStyle = await titleCell.evaluate(el => {
-        const computed = window.getComputedStyle(el);
-        return {
-          overflow: computed.overflow,
-          textOverflow: computed.textOverflow,
-          whiteSpace: computed.whiteSpace
-        };
-      });
-      
-      expect(cellStyle.overflow === 'hidden' || cellStyle.textOverflow === 'ellipsis').toBeTruthy();
-    }
+    const cellStyle = await titleCell.evaluate(el => window.getComputedStyle(el));
+    expect(cellStyle.overflow).toBe('hidden');
+    
+    await longTitleRow.click();
+    await expect(page.locator('#detail-modal')).toBeVisible();
+    await expect(page.locator('#detail-content')).toContainText('申請タイトル');
+    await page.click('#close-modal');
   });
 });

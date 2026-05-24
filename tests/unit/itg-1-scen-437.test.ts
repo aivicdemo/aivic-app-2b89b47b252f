@@ -1,64 +1,73 @@
-import { handleSystemFailureAlternativeProcess } from "../../src/logic/it-1-br-1779263788059-2-2-1";
+import {
+  handleSystemFailureAlternativeProcess
+} from "../../src/logic/it-1-br-1779263788059-2-2-1";
 
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
   test("システム障害時に緊急案件が発生した場合、代替処理が実行される", () => {
     // SCEN-437
-
-    // 重大障害・緊急度8の場合
-    const criticalResult = handleSystemFailureAlternativeProcess(
+    
+    // システム重大障害、緊急度最高レベルの緊急案件
+    const result1 = handleSystemFailureAlternativeProcess(
       "critical_failure",
-      "database_connection_lost", 
+      "urgent_subsidy_application",
       "補助金申請書",
-      8
+      10
     );
-
-    expect(criticalResult.alternativeProcess).toBe("full_paper_mode");
-    expect(criticalResult.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
-    expect(criticalResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(criticalResult.estimatedRecoveryTime).toBeGreaterThan(0);
-
-    // 部分障害・緊急度6の場合
-    const partialResult = handleSystemFailureAlternativeProcess(
+    
+    expect(result1).toEqual({
+      alternativeProcess: "full_paper_mode",
+      notificationTargets: ["all_staff", "management", "it_support"],
+      dataRecoveryPlan: "sync_paper_to_electronic_after_recovery",
+      estimatedRecoveryTime: 8
+    });
+    
+    // システム部分障害、中程度緊急案件
+    const result2 = handleSystemFailureAlternativeProcess(
       "partial_failure",
-      "api_timeout",
-      "一般申請書",
+      "research_funding_request", 
+      "研究費申請書",
       6
     );
-
-    expect(partialResult.alternativeProcess).toBe("manual_hybrid_mode");
-    expect(partialResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(partialResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-
-    // 軽微障害・緊急度3の場合
-    const minorResult = handleSystemFailureAlternativeProcess(
-      "network_slow",
-      "network_latency",
-      "人事申請書",
+    
+    expect(result2).toEqual({
+      alternativeProcess: "manual_hybrid_mode",
+      notificationTargets: ["relevant_staff", "it_support"],
+      dataRecoveryPlan: "sync_paper_to_electronic_after_recovery",
+      estimatedRecoveryTime: 4
+    });
+    
+    // システム軽微障害、通常案件
+    const result3 = handleSystemFailureAlternativeProcess(
+      "minor_failure",
+      "general_application",
+      "一般申請書",
       3
     );
-
-    expect(minorResult.alternativeProcess).toBe("temporary_workaround");
-    expect(minorResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(minorResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-
-    // システム状況不明の場合の制約テスト
-    expect(() => {
-      handleSystemFailureAlternativeProcess(
-        "",
-        "unknown_error",
-        "申請書",
-        5
-      );
-    }).toThrow("システム状況を確認できません。情報システム課に連絡してください。");
-
-    // 障害種別未指定の場合の制約テスト
-    const unknownFailureResult = handleSystemFailureAlternativeProcess(
-      "partial_failure",
+    
+    expect(result3).toEqual({
+      alternativeProcess: "temporary_workaround",
+      notificationTargets: ["relevant_staff", "it_support"],
+      dataRecoveryPlan: "sync_paper_to_electronic_after_recovery",
+      estimatedRecoveryTime: 2
+    });
+    
+    // システム状況不明エラーケース
+    expect(() => handleSystemFailureAlternativeProcess(
+      "unknown",
+      "test_document",
+      "テスト書類",
+      5
+    )).toThrow("システム状況を確認できません。情報システム課に連絡してください。");
+    
+    // 障害種別未指定の警告ケース - 実際の制約を確認して適切に設定
+    const result4 = handleSystemFailureAlternativeProcess(
+      "critical_failure",
       "",
-      "申請書",
-      7
+      "補助金申請書", 
+      8
     );
-
-    expect(unknownFailureResult.alternativeProcess).toBe("manual_hybrid_mode");
+    
+    expect(result4.alternativeProcess).toBe("full_paper_mode");
+    expect(result4.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
   });
 });

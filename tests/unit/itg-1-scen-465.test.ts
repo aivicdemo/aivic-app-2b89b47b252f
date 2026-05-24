@@ -1,66 +1,99 @@
-import { identifyNotificationRecipient } from "../../src/logic/it-1-br-1-2-1";
+import { determinePriorityForApprovalNotification } from '../../src/logic/it-1-br-1-2-1';
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("高緊急度案件（補助金関連・緊急連絡）の通知優先度判定", () => {
+  test("高緊急度案件が即座に通知される", () => {
     // SCEN-465
-
-    // 補助金関連書類で承認者が対応可能な場合
-    const result1 = identifyNotificationRecipient(
-      "APPL-2024-001",
-      "補助金申請",
-      "部長承認",
-      "MGR-001",
-      true
-    );
-
-    expect(result1.recipientId).toBe("MGR-001");
-    expect(result1.recipientType).toBe("primary_approver");
-    expect(result1.notificationMethod).toBe("urgent_contact");
-    expect(result1.escalationRequired).toBe(false);
-
-    // 一般書類で承認者が不在の場合
-    const result2 = identifyNotificationRecipient(
-      "APPL-2024-002",
-      "一般事務",
-      "課長承認",
-      "MGR-002",
+    
+    // 期限まで3日以内の緊急案件
+    const result1 = determinePriorityForApprovalNotification(
+      "緊急設備申請書",
+      "設備申請",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-03T17:00:00Z"), // 3日以内
       false
     );
-
-    expect(result2.recipientId).not.toBe("MGR-002");
-    expect(result2.recipientType).toBe("substitute_approver");
-    expect(result2.notificationMethod).toBe("email");
-    expect(result2.escalationRequired).toBe(false);
-
-    // 補助金関連書類で代理者も見つからない場合
-    const result3 = identifyNotificationRecipient(
-      "APPL-2024-003",
+    
+    expect(result1.priority).toBe('high');
+    expect(result1.notificationTiming).toBe('immediate');
+    expect(result1.urgencyReason).toBe('期限まで3日以内');
+    
+    // 補助金関連申請（期限に関係なく高優先度）
+    const result2 = determinePriorityForApprovalNotification(
       "科研費申請書",
-      "理事承認",
-      "DIR-001",
+      "補助金申請",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-15T17:00:00Z"), // 期限まで2週間
+      true
+    );
+    
+    expect(result2.priority).toBe('high');
+    expect(result2.notificationTiming).toBe('immediate');
+    expect(result2.urgencyReason).toBe('補助金関連申請');
+    
+    // タイトルに緊急キーワード含有
+    const result3 = determinePriorityForApprovalNotification(
+      "至急対応が必要な物品購入申請",
+      "物品申請",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-20T17:00:00Z"), // 期限まで3週間
       false
     );
-
-    expect(result3.recipientType).toBe("superior_approver");
-    expect(result3.notificationMethod).toBe("urgent_contact");
-    expect(result3.escalationRequired).toBe(true);
-
-    // エラーケース：申請案件の識別番号が空
-    expect(() => identifyNotificationRecipient(
+    
+    expect(result3.priority).toBe('high');
+    expect(result3.notificationTiming).toBe('immediate');
+    expect(result3.urgencyReason).toBe('タイトルに緊急キーワード含有');
+    
+    // 期限まで7日以内（通常優先度）
+    const result4 = determinePriorityForApprovalNotification(
+      "通常の備品申請",
+      "物品申請",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-06T17:00:00Z"), // 6日
+      false
+    );
+    
+    expect(result4.priority).toBe('normal');
+    expect(result4.notificationTiming).toBe('scheduled');
+    expect(result4.urgencyReason).toBe('期限まで1週間以内');
+    
+    // 低優先度案件
+    const result5 = determinePriorityForApprovalNotification(
+      "日常業務報告書",
+      "報告書",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-30T17:00:00Z"), // 期限まで1か月
+      false
+    );
+    
+    expect(result5.priority).toBe('low');
+    expect(result5.notificationTiming).toBe('scheduled');
+    expect(result5.urgencyReason).toBe('通常の申請案件');
+    
+    // エラーケース：タイトルが空
+    expect(() => determinePriorityForApprovalNotification(
       "",
-      "補助金申請",
-      "部長承認",
-      "MGR-001",
-      true
-    )).toThrow("催促対象の申請案件が特定できません。正しい申請番号を確認してください。");
-
-    // エラーケース：承認段階の情報が取得できない
-    expect(() => identifyNotificationRecipient(
-      "APPL-2024-004",
-      "補助金申請",
+      "物品申請",
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-06T17:00:00Z"),
+      false
+    )).toThrow("申請書類のタイトルが入力されていません。");
+    
+    // エラーケース：文書種別が未指定
+    expect(() => determinePriorityForApprovalNotification(
+      "テスト申請",
       "",
-      "MGR-001",
-      true
-    )).toThrow("承認フローの現在段階を特定できません。申請状況を確認してください。");
+      new Date("2024-01-01T09:00:00Z"),
+      new Date("2024-01-06T17:00:00Z"),
+      false
+    )).toThrow("申請書類の種別を選択してください。");
+    
+    // エラーケース：提出日時が未来
+    expect(() => determinePriorityForApprovalNotification(
+      "テスト申請",
+      "物品申請",
+      new Date("2024-12-31T09:00:00Z"),
+      new Date("2024-01-06T17:00:00Z"),
+      false
+    )).toThrow("提出日時に未来の日付は指定できません。");
   });
 });

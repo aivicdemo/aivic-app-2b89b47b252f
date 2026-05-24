@@ -1,47 +1,62 @@
-import { validateReminderFrequency } from '../../src/logic/it-1-br-1-2-1';
+import { validateReminderFrequency } from "../../src/logic/it-1-br-1-2-1";
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  // SCEN-452
   test("制限期間ギリギリの催促要求が適切に処理される", () => {
-    // 3日前に催促送信済みの場合 - 制限期間ギリギリで送信不可
-    const lastReminder2DaysAgo = new Date('2024-01-10T10:00:00');
-    const current2DaysLater = new Date('2024-01-12T10:00:00');
+    // SCEN-452
+    
+    // 制限期間ちょうど3日経過（送信可能）
+    const exactlyThreeDaysAgo = new Date("2024-01-01T10:00:00Z");
+    const currentDate = new Date("2024-01-04T10:00:00Z");
     
     const result1 = validateReminderFrequency(
-      'APP-001',
-      'APPROVER-001', 
-      lastReminder2DaysAgo,
-      current2DaysLater
+      "APP001",
+      "APPROVER001", 
+      exactlyThreeDaysAgo,
+      currentDate
     );
     
-    expect(result1.canSendReminder).toBe(false);
-    expect(result1.waitingDays).toBe(2);
-    expect(result1.nextAllowedDate).toEqual(new Date('2024-01-13T10:00:00'));
-
-    // 3日経過した場合 - 送信可能
-    const current3DaysLater = new Date('2024-01-13T10:00:00');
+    expect(result1.canSendReminder).toBe(true);
+    expect(result1.waitingDays).toBe(3);
+    expect(result1.nextAllowedDate).toBe(null);
+    
+    // 制限期間直前（2日後 - 送信不可）
+    const twoDaysAgo = new Date("2024-01-02T10:00:00Z");
     
     const result2 = validateReminderFrequency(
-      'APP-001',
-      'APPROVER-001',
-      lastReminder2DaysAgo, 
-      current3DaysLater
+      "APP002",
+      "APPROVER002",
+      twoDaysAgo, 
+      currentDate
     );
     
-    expect(result2.canSendReminder).toBe(true);
-    expect(result2.waitingDays).toBe(3);
-    expect(result2.nextAllowedDate).toBe(null);
-
-    // 初回催促の場合 - 送信可能
+    expect(result2.canSendReminder).toBe(false);
+    expect(result2.waitingDays).toBe(2);
+    expect(result2.nextAllowedDate).toEqual(new Date("2024-01-05T10:00:00Z"));
+    
+    // 初回送信（最後の催促なし）
     const result3 = validateReminderFrequency(
-      'APP-002',
-      'APPROVER-002',
+      "APP003",
+      "APPROVER003",
       null,
-      current3DaysLater
+      currentDate
     );
     
     expect(result3.canSendReminder).toBe(true);
     expect(result3.waitingDays).toBe(0);
     expect(result3.nextAllowedDate).toBe(null);
+    
+    // 制限期間超過（4日経過 - 送信可能）
+    const fourDaysAgo = new Date("2023-12-31T10:00:00Z");
+    
+    const result4 = validateReminderFrequency(
+      "APP004", 
+      "APPROVER004",
+      fourDaysAgo,
+      currentDate
+    );
+    
+    expect(result4.canSendReminder).toBe(true);
+    expect(result4.waitingDays).toBe(4);
+    expect(result4.nextAllowedDate).toBe(null);
   });
 });

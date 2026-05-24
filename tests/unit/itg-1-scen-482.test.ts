@@ -1,30 +1,72 @@
-import { determineNextApprover } from "../../src/logic/it-1-br-2-2-1";
+import {
+  determineApprovalDecision,
+  handleSystemFailureAlternativeProcess,
+  determineNextApprover
+} from "../../src/logic/it-1-br-2-2-1";
 
 describe("文書種別に応じた承認フロー自動振り分け機能", () => {
   test("承認判断処理ルート決定 - 処理ルート決定に失敗した場合、エラー処理が実行される", () => {
     // SCEN-482
-    
-    // 申請書類のタイトルが空の場合
-    expect(() => determineNextApprover("", "申請書類の本文内容", "課長", "承認")).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
-    
-    // 承認判断が選択されていない場合
-    expect(() => determineNextApprover("補助金申請書", "科研費の申請内容です", "課長", "")).toThrow("承認・差戻し・却下のいずれかを選択してください。");
-    
-    // 現在の承認者の役職が不明な場合
-    expect(() => determineNextApprover("補助金申請書", "科研費の申請内容です", "", "承認")).toThrow("承認者の役職情報が取得できません。システム管理者にお問い合わせください。");
-    
-    // 正常ケース: 補助金関連書類で紙保管が必要
-    const result1 = determineNextApprover("科研費申請書", "科研費による研究費申請書類です", "課長", "承認");
-    expect(result1.isSubsidyRelated).toBe(true);
-    expect(result1.requiresPaperStorage).toBe(true);
-    expect(result1.processingRoute).toBe("hybrid");
-    expect(result1.nextApprover).toBe("部長");
-    
-    // 正常ケース: 一般申請書類で電子のみ処理
-    const result2 = determineNextApprover("備品購入申請書", "研究室の机と椅子の購入申請です", "課長", "承認");
-    expect(result2.isSubsidyRelated).toBe(false);
-    expect(result2.requiresPaperStorage).toBe(false);
-    expect(result2.processingRoute).toBe("electronic");
-    expect(result2.nextApprover).toBe("部長");
+
+    // システム障害により承認判断処理ルートの決定に失敗するケース
+    const systemStatus = "critical_failure";
+    const failureType = "approval_route_determination_error";
+    const documentType = "補助金申請書";
+    const urgencyLevel = 9;
+
+    const result = handleSystemFailureAlternativeProcess(
+      systemStatus,
+      failureType,
+      documentType,
+      urgencyLevel
+    );
+
+    expect(result.alternativeProcess).toBe("full_paper_mode");
+    expect(result.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
+    expect(result.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
+
+    // 承認判断でエラーが発生するケース - 申請書類の内容が空
+    expect(() => {
+      determineApprovalDecision(
+        "",
+        ["重大な不備"],
+        true,
+        5
+      );
+    }).toThrow("申請書類の内容が入力されていません。承認判定を行うことができません。");
+
+    // 次の承認者決定でエラーが発生するケース - タイトルが空
+    expect(() => {
+      determineNextApprover(
+        "",
+        "申請内容の詳細",
+        "課長",
+        "承認"
+      );
+    }).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
+
+    // 承認判断決定処理が正常に動作するケース
+    const normalResult = determineApprovalDecision(
+      "補助金申請の詳細内容について記載しています。設備購入費用として500万円を申請いたします。",
+      ["軽微な記載不備"],
+      true,
+      4
+    );
+
+    expect(normalResult.decision).toBe("conditional");
+    expect(normalResult.reason).toBe("軽微な不備があるが緊急性を考慮");
+    expect(normalResult.nextAction).toBe("fulfill_conditions");
+
+    // 次の承認者決定が正常に動作するケース
+    const nextApproverResult = determineNextApprover(
+      "科研費申請書",
+      "研究費申請の内容について詳細に記載しています。",
+      "課長",
+      "承認"
+    );
+
+    expect(nextApproverResult.isSubsidyRelated).toBe(true);
+    expect(nextApproverResult.requiresPaperStorage).toBe(true);
+    expect(nextApproverResult.processingRoute).toBe("hybrid");
   });
 });

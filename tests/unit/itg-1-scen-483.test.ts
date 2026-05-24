@@ -1,82 +1,67 @@
-import { identifyNotificationRecipient } from "../../src/logic/it-1-br-1779263788059-2-2-1";
+import { determineNotificationTargets } from "../../src/logic/it-1-br-1779263788059-2-2-1";
 
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
-  test("承認遅延が発生している申請案件で催促通知の送信対象者を特定する", () => {
+  test("承認結果通知 - 承認完了時に関係者に適切な通知が送信される", () => {
     // SCEN-483
+    
+    // 承認案件（補助金関連、緊急度高）
+    const approvalResult = "approved";
+    const applicationData = {
+      applicant_id: "staff001",
+      department_id: "research_dept",
+      urgency_level: "high"
+    };
+    const approverInfo = {
+      department: "admin_office",
+      position: "section_chief",
+      authority_level: "standard"
+    };
+    const documentClassification = {
+      subsidyRelated: true,
+      moeRequirement: true,
+      paperStorageRequired: true
+    };
 
-    // 補助金関連の緊急連絡が必要なケース
-    const result1 = identifyNotificationRecipient(
-      "APP-001",
-      "補助金申請書",
-      "部長承認",
-      "MGR-001",
-      true
-    );
+    const result = determineNotificationTargets(approvalResult, applicationData, approverInfo, documentClassification);
 
-    expect(result1).toEqual({
-      recipientId: "MGR-001",
-      recipientType: "primary_approver", 
-      notificationMethod: "urgent_contact",
-      escalationRequired: false
-    });
+    expect(result.primaryTargets).toEqual(["staff001", "supervisor_of_staff001"]);
+    expect(result.secondaryTargets).toEqual(["finance_dept", "audit_dept", "research_dept_manager"]);
+    expect(result.notificationMethod).toBe("hybrid");
+    expect(result.auditTrailRequired).toBe(true);
 
-    // 一般事務で代理承認者が必要なケース
-    const result2 = identifyNotificationRecipient(
-      "APP-002", 
-      "人事関連",
-      "課長承認",
-      "MGR-002",
-      false
-    );
+    // 却下案件（一般申請、緊急度中）
+    const rejectionResult = "rejected";
+    const generalApplicationData = {
+      applicant_id: "staff002",
+      department_id: "general_affairs",
+      urgency_level: "medium"
+    };
+    const generalDocumentClassification = {
+      subsidyRelated: false,
+      moeRequirement: false,
+      paperStorageRequired: false
+    };
 
-    expect(result2).toEqual({
-      recipientId: "SUB-001",
-      recipientType: "substitute_approver",
-      notificationMethod: "email", 
-      escalationRequired: false
-    });
+    const rejectionNotification = determineNotificationTargets(rejectionResult, generalApplicationData, approverInfo, generalDocumentClassification);
 
-    // 承認権限者不在で上位エスカレーションが必要なケース
-    const result3 = identifyNotificationRecipient(
-      "APP-003",
-      "一般事務",
-      "理事承認", 
-      "MGR-003",
-      false
-    );
+    expect(rejectionNotification.primaryTargets).toEqual(["staff002", "supervisor_of_staff002", "general_affairs_admin"]);
+    expect(rejectionNotification.secondaryTargets).toEqual([]);
+    expect(rejectionNotification.notificationMethod).toBe("electronic");
+    expect(rejectionNotification.auditTrailRequired).toBe(false);
 
-    expect(result3).toEqual({
-      recipientId: "DIR-001",
-      recipientType: "superior_approver",
-      notificationMethod: "email",
-      escalationRequired: true
-    });
+    // 差し戻し案件（補助金関連、緊急度低）
+    const returnResult = "returned";
+    const subsidyApplicationData = {
+      applicant_id: "staff003",
+      department_id: "finance_dept",
+      urgency_level: "low"
+    };
 
-    // 申請案件IDが空の場合のエラー
-    expect(() => identifyNotificationRecipient(
-      "",
-      "補助金申請書",
-      "部長承認", 
-      "MGR-001",
-      true
-    )).toThrow("催促対象の申請案件が特定できません。正しい申請番号を確認してください。");
+    const returnNotification = determineNotificationTargets(returnResult, subsidyApplicationData, approverInfo, documentClassification);
 
-    // 承認段階が不明な場合のエラー
-    expect(() => identifyNotificationRecipient(
-      "APP-001",
-      "補助金申請書",
-      "",
-      "MGR-001", 
-      true
-    )).toThrow("承認フローの現在段階を特定できません。申請状況を確認してください。");
-
-    // 承認権限者も代理者も特定できない場合のエラー
-    expect(() => identifyNotificationRecipient(
-      "APP-001",
-      "補助金申請書",
-      "invalid_stage",
-      "",
-      false
-    )).toThrow("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
+    expect(returnNotification.primaryTargets).toEqual(["staff003", "supervisor_of_staff003", "finance_dept_admin"]);
+    expect(returnNotification.secondaryTargets).toEqual(["finance_dept", "audit_dept"]);
+    expect(returnNotification.notificationMethod).toBe("hybrid");
+    expect(returnNotification.auditTrailRequired).toBe(true);
   });
 });

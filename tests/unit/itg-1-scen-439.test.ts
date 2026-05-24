@@ -4,66 +4,63 @@ describe("承認フローの進捗状況と滞留期間をリアルタイムで�
   test("システム障害時代替処理 - 障害復旧後にデータ同期が正常に実行される", () => {
     // SCEN-439
     
-    // 通常稼働時のテスト
-    const normalResult = handleSystemFailureAlternativeProcess(
-      "normal",
-      "network_timeout", 
-      "補助金申請書",
-      5
-    );
-    
-    expect(normalResult.alternativeProcess).toBe("temporary_workaround");
-    expect(normalResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(normalResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(normalResult.estimatedRecoveryTime).toBeDefined();
-    
-    // 部分障害時のテスト
-    const partialFailureResult = handleSystemFailureAlternativeProcess(
-      "partial_failure",
-      "database_connection",
-      "研究費申請書", 
-      7
-    );
-    
-    expect(partialFailureResult.alternativeProcess).toBe("manual_hybrid_mode");
-    expect(partialFailureResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(partialFailureResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(partialFailureResult.estimatedRecoveryTime).toBeDefined();
-    
-    // 重大障害時のテスト  
-    const criticalFailureResult = handleSystemFailureAlternativeProcess(
+    // 重大な障害時の代替処理
+    const result1 = handleSystemFailureAlternativeProcess(
       "critical_failure",
-      "system_crash",
-      "設備申請書",
-      6
-    );
-    
-    expect(criticalFailureResult.alternativeProcess).toBe("full_paper_mode");
-    expect(criticalFailureResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(criticalFailureResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(criticalFailureResult.estimatedRecoveryTime).toBeDefined();
-    
-    // 高緊急度案件のテスト
-    const urgentResult = handleSystemFailureAlternativeProcess(
-      "partial_failure",
-      "api_timeout",
+      "network_failure",
       "補助金申請書",
       9
     );
     
-    expect(urgentResult.alternativeProcess).toBe("manual_hybrid_mode");
-    expect(urgentResult.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
-    expect(urgentResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(urgentResult.estimatedRecoveryTime).toBeDefined();
+    expect(result1.alternativeProcess).toBe("full_paper_mode");
+    expect(result1.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
+    expect(result1.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
+    expect(result1.estimatedRecoveryTime).toBe(240);
+
+    // 部分的な障害時の代替処理
+    const result2 = handleSystemFailureAlternativeProcess(
+      "partial_failure",
+      "database_timeout",
+      "一般申請書",
+      6
+    );
     
-    // 制約チェック - システム状況が不明または取得できない場合
+    expect(result2.alternativeProcess).toBe("manual_hybrid_mode");
+    expect(result2.notificationTargets).toEqual(["relevant_staff", "it_support"]);
+    expect(result2.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
+    expect(result2.estimatedRecoveryTime).toBe(120);
+
+    // 軽微な障害時の代替処理
+    const result3 = handleSystemFailureAlternativeProcess(
+      "minor_issue",
+      "slow_response",
+      "人事関連書類",
+      3
+    );
+    
+    expect(result3.alternativeProcess).toBe("temporary_workaround");
+    expect(result3.notificationTargets).toEqual(["relevant_staff", "it_support"]);
+    expect(result3.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
+    expect(result3.estimatedRecoveryTime).toBe(60);
+
+    // システム状況不明時のエラー
     expect(() => {
       handleSystemFailureAlternativeProcess(
-        "",
-        "network_error",
+        "unknown",
+        "unknown_error",
         "申請書",
         5
       );
     }).toThrow("システム状況を確認できません。情報システム課に連絡してください。");
+
+    // 緊急度レベル範囲外時の警告
+    expect(() => {
+      handleSystemFailureAlternativeProcess(
+        "critical_failure",
+        "system_down",
+        "申請書",
+        15
+      );
+    }).toThrow("緊急度は1から10の範囲で指定してください。");
   });
 });

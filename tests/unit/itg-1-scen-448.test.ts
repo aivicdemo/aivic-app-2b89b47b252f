@@ -5,54 +5,62 @@ describe("承認遅延案件を検知し担当者に自動で催促通知を送�
     // SCEN-448
     const pendingApplications = [
       {
-        applicationId: "app-001",
-        delayDays: 5,
-        approverLevel: 3,
-        documentImportance: 4,
-        applicantDepartment: "財務課"
+        applicationId: "APP001",
+        delayDays: 3,
+        approverLevel: 2,
+        documentImportance: 5,
+        applicantDepartment: "総務課"
       },
       {
-        applicationId: "app-002", 
-        delayDays: 5,
-        approverLevel: 3,
+        applicationId: "APP002", 
+        delayDays: 3,
+        approverLevel: 2,
+        documentImportance: 6,
+        applicantDepartment: "経理課"
+      },
+      {
+        applicationId: "APP003",
+        delayDays: 4,
+        approverLevel: 1,
         documentImportance: 4,
         applicantDepartment: "人事課"
       },
       {
-        applicationId: "app-003",
-        delayDays: 4,
-        approverLevel: 4,
-        documentImportance: 4,
-        applicantDepartment: "総務課"
+        applicationId: "APP004",
+        delayDays: 2,
+        approverLevel: 3,
+        documentImportance: 7,
+        applicantDepartment: "学務課"
       }
     ];
 
     const priorityWeights = {
-      delayWeight: 2,
-      levelWeight: 3,
-      importanceWeight: 1
+      delayWeight: 10,
+      levelWeight: 5,
+      importanceWeight: 3
     };
 
     const result = determinePriorityForReminder(pendingApplications, priorityWeights);
 
-    const app001Score = 5 * 2 + 3 * 3 + 4 * 1; // 23
-    const app002Score = 5 * 2 + 3 * 3 + 4 * 1; // 23
-    const app003Score = 4 * 2 + 4 * 3 + 4 * 1; // 24
-
     expect(result).toEqual([
       {
-        applicationId: "app-003",
-        priorityScore: 24,
+        applicationId: "APP003",
+        priorityScore: 45,
+        reminderUrgency: "medium"
+      },
+      {
+        applicationId: "APP002",
+        priorityScore: 43,
+        reminderUrgency: "medium"
+      },
+      {
+        applicationId: "APP001",
+        priorityScore: 40,
         reminderUrgency: "low"
       },
       {
-        applicationId: "app-001",
-        priorityScore: 23,
-        reminderUrgency: "low"
-      },
-      {
-        applicationId: "app-002",
-        priorityScore: 23,
+        applicationId: "APP004",
+        priorityScore: 36,
         reminderUrgency: "low"
       }
     ]);
