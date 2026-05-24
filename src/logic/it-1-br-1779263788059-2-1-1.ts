@@ -2,15 +2,17 @@
 // slug: it-1-br-1779263788059-2-1-1
 // 関数: validateApplicationBeforeSubmission, analyzeRegulationImpactScope, classifyLegalChangeImpactLevel, migrateExistingDataToNewClassification, setApproverAuthorityLevel, determineApprovalHierarchy, setApprovalDeadline
 
+export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[] }
+
 export interface DocumentType { typeName: string; regulationCategory: string; storageRequirement: string }
 
-export interface ProcessingRule { document_type: string; storage_requirement?: string }
+export interface ProcessingRouteChange { documentType: string; oldRoute: string; newRoute: string }
 
 export interface RouteUpdate { documentId: string; oldRoute: string; newRoute: string }
 
-export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; subsidyKeywords?: string[]; moeRequirement?: boolean; subsidyRelated?: boolean }
+export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired: boolean }
 
-export interface Document { id: string; title?: string | null; content?: string; documentType?: string; type?: string; current_processing_route: string }
+export interface Document { id: string; type?: string; documentType?: string; current_processing_route: string; title?: string; content?: string }
 
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
@@ -19,7 +21,7 @@ export function validateApplicationBeforeSubmission(
   processingRoute: string,
   approvalRoute: string[],
   requiredFields: Record<string, any>
-): { isValid: boolean; errors: string[]; warnings: string[] } {
+): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -55,12 +57,14 @@ export function validateApplicationBeforeSubmission(
 }
 
 function extractAffectedRegulations(regulationChangeContent: string, affectedRegulationTypes: string[]): string[] {
-  const contentLower = regulationChangeContent.toLowerCase();
+  if (!regulationChangeContent || regulationChangeContent.trim().length < 10) {
+    throw new Error("法令改正の変更内容が正しく取得できていません。改正通知の受信処理を確認してください。");
+  }
+  
   return affectedRegulationTypes.filter(regType => 
-    contentLower.includes(regType.toLowerCase()) || 
-    contentLower.includes('補助金') || 
-    contentLower.includes('申請書') ||
-    contentLower.includes('研究費')
+    regulationChangeContent.includes(regType) || 
+    regulationChangeContent.includes("補助金") && regType.includes("補助金") ||
+    regulationChangeContent.includes("研究") && regType.includes("補助金")
   );
 }
 
@@ -68,35 +72,28 @@ function isRegulationMatch(regulationCategory: string, affectedRegulations: stri
   return affectedRegulations.some(reg => 
     regulationCategory.includes(reg) || 
     reg.includes(regulationCategory) ||
-    (regulationCategory.includes('補助金') && reg.includes('補助金')) ||
-    (regulationCategory.includes('法') && reg.includes('法'))
+    (regulationCategory.includes("補助金") && reg.includes("補助金")) ||
+    (regulationCategory === "補助金法" && reg.includes("補助金")) ||
+    (regulationCategory === "補助金関連" && reg.includes("補助金")) ||
+    (regulationCategory === "補助金関連法令" && reg.includes("補助金"))
   );
 }
 
-function determineNewProcessingRoute(docType: DocumentType, regulationChangeContent: string): string {
-  const contentLower = regulationChangeContent.toLowerCase();
-  
-  if (contentLower.includes('電子化') || contentLower.includes('電子保存') || contentLower.includes('保管要件が変更')) {
-    return 'hybrid';
+function determineNewProcessingRouteInternal(docType: DocumentType, regulationChangeContent: string): string {
+  if (regulationChangeContent.includes("電子保存要件が変更") || 
+      regulationChangeContent.includes("保管要件が変更") ||
+      regulationChangeContent.includes("電子化に関する法令改正")) {
+    return "hybrid";
   }
-  
-  if (contentLower.includes('紙のみ') || contentLower.includes('書面保存')) {
-    return 'paper';
-  }
-  
-  return docType.storageRequirement === 'electronic' ? 'hybrid' : docType.storageRequirement;
+  return docType.storageRequirement;
 }
 
 export function analyzeRegulationImpactScope(
   regulationChangeContent: string, 
   affectedRegulationTypes: string[], 
   currentDocumentTypes: DocumentType[]
-): { 
-  affectedDocumentTypes: string[]; 
-  processingRouteChanges: { documentType: string; oldRoute: string; newRoute: string }[]; 
-  impactLevel: string; 
-  changeRequiredCount: number 
-} {
+): { affectedDocumentTypes: string[]; processingRouteChanges: ProcessingRouteChange[]; impactLevel: string; changeRequiredCount: number } {
+  
   if (!regulationChangeContent || regulationChangeContent.trim().length < 10) {
     throw new Error("法令改正の変更内容が正しく取得できていません。改正通知の受信処理を確認してください。");
   }
@@ -107,13 +104,13 @@ export function analyzeRegulationImpactScope(
 
   const affectedRegulations = extractAffectedRegulations(regulationChangeContent, affectedRegulationTypes);
   const affectedTypes: string[] = [];
-  const routeChanges: { documentType: string; oldRoute: string; newRoute: string }[] = [];
+  const routeChanges: ProcessingRouteChange[] = [];
   
   for (const docType of currentDocumentTypes) {
     if (isRegulationMatch(docType.regulationCategory, affectedRegulations)) {
       affectedTypes.push(docType.typeName);
       const currentRoute = docType.storageRequirement;
-      const newRoute = determineNewProcessingRoute(docType, regulationChangeContent);
+      const newRoute = determineNewProcessingRouteInternal(docType, regulationChangeContent);
       if (currentRoute !== newRoute) {
         routeChanges.push({ 
           documentType: docType.typeName, 
@@ -141,10 +138,10 @@ export function analyzeRegulationImpactScope(
 export function classifyLegalChangeImpactLevel(
   changeNotification: string,
   affectedDocumentTypes: string[],
-  currentProcessingRules: ProcessingRule[],
+  currentProcessingRules: any[],
   complianceDeadline: Date
-): { impactLevel: 'high' | 'medium' | 'low'; priority: number; requiredResponseDays: number; affectedRuleCount: number; riskAssessment: string } {
-  if (!changeNotification || changeNotification.trim() === '') {
+): { impactLevel: string; priority: number; requiredResponseDays: number; affectedRuleCount: number; riskAssessment: string } {
+  if (!changeNotification || changeNotification.trim() === "") {
     throw new Error("法令改正通知の内容が正しく取得できません。通知内容を確認してください。");
   }
 
@@ -153,17 +150,17 @@ export function classifyLegalChangeImpactLevel(
     console.warn("施行日が過去の日付です。緊急対応が必要な可能性があります。");
   }
 
-  if (affectedDocumentTypes.length === 0) {
-    console.warn("この法令改正による直接的な影響は検出されませんでした。念のため手動確認を推奨します。");
-  }
-
   const hasSubsidyRequirementChange = changeNotification.includes("補助金") || changeNotification.includes("交付要綱");
   const affectedRuleCount = currentProcessingRules.filter(rule => 
     affectedDocumentTypes.includes(rule.document_type)
   ).length;
   const daysUntilDeadline = Math.floor((complianceDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-  let impactLevel: 'high' | 'medium' | 'low' = "low";
+  if (affectedRuleCount === 0) {
+    console.warn("この法令改正による直接的な影響は検出されませんでした。念のため手動確認を推奨します。");
+  }
+
+  let impactLevel = "low";
   let priority = 3;
   let requiredResponseDays = 60;
 
@@ -180,13 +177,7 @@ export function classifyLegalChangeImpactLevel(
   const riskAssessment = impactLevel === "high" ? "法令違反リスク高" : 
                         impactLevel === "medium" ? "業務遅延リスク中" : "影響軽微";
 
-  return {
-    impactLevel,
-    priority,
-    requiredResponseDays,
-    affectedRuleCount,
-    riskAssessment
-  };
+  return { impactLevel, priority, requiredResponseDays, affectedRuleCount, riskAssessment };
 }
 
 interface MigrationResult {
@@ -196,78 +187,74 @@ interface MigrationResult {
   updatedRoutes: RouteUpdate[];
 }
 
+function isInMigrationScope(document: Document, migrationScope: string): boolean {
+  const docType = document.type || document.documentType || '';
+  const title = document.title || '';
+  const content = document.content || '';
+  
+  if (migrationScope === '補助金関連書類' || migrationScope === '補助金関連') {
+    return docType.includes('補助金') || 
+           title.includes('補助金') || 
+           title.includes('科研費') || 
+           title.includes('設備整備費') || 
+           content.includes('補助金') || 
+           content.includes('科研費') || 
+           content.includes('設備整備費');
+  }
+  
+  return true;
+}
+
+function applyNewRulesInternal(document: Document, newClassificationRules: ClassificationRule[]): { processingRoute: string } {
+  const docType = document.type || document.documentType || '';
+  const title = document.title || '';
+  const content = document.content || '';
+  
+  // 補助金関連キーワードをチェック
+  const hasSubsidyKeywords = title.includes('科研費') || 
+                            title.includes('設備整備費') || 
+                            content.includes('科研費') || 
+                            content.includes('設備整備費') ||
+                            content.includes('科学研究費補助金') ||
+                            content.includes('設備整備費補助金');
+  
+  // 補助金関連キーワードがある場合はhybridルートに
+  if (hasSubsidyKeywords) {
+    return { processingRoute: 'hybrid' };
+  }
+  
+  // 文書タイプに基づく分類
+  for (const rule of newClassificationRules) {
+    if (docType === rule.documentType) {
+      return { processingRoute: rule.processingRoute };
+    }
+  }
+  
+  return { processingRoute: document.current_processing_route };
+}
+
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: ClassificationRule[],
-  existingDocuments: Document[],
+  newClassificationRules: ClassificationRule[], 
+  existingDocuments: Document[], 
   migrationScope: string
 ): { migratedCount: number; skippedCount: number; errorCount: number; updatedRoutes: RouteUpdate[] } {
   if (newClassificationRules.length === 0) {
-    throw new Error("法令改正に基づく新しい分類基準が設定されていません。分類基準を確認してください。");
+    throw new Error('法令改正に基づく新しい分類基準が設定されていません。分類基準を確認してください。');
   }
-
-  const isInMigrationScope = (doc: Document, scope: string): boolean => {
-    const docType = doc.documentType || doc.type || "";
-    const title = doc.title || "";
-    const content = doc.content || "";
-    
-    if (scope === "補助金関連" || scope === "補助金関連書類") {
-      return docType.includes("補助金") || 
-             title.includes("補助金") || 
-             title.includes("科研費") || 
-             title.includes("設備整備費") ||
-             content.includes("補助金") ||
-             content.includes("科研費") ||
-             content.includes("設備整備費");
-    }
-    
-    return true;
-  };
-
-  const applyNewRules = (doc: Document, rules: ClassificationRule[]): ClassificationRule => {
-    const docType = doc.documentType || doc.type || "";
-    const title = doc.title || "";
-    const content = doc.content || "";
-    
-    // 補助金関連キーワードをチェック
-    const hasSubsidyKeywords = title.includes("科研費") || 
-                              title.includes("設備整備費") ||
-                              content.includes("科研費") ||
-                              content.includes("設備整備費") ||
-                              content.includes("補助金");
-    
-    if (hasSubsidyKeywords) {
-      const subsidyRule = rules.find(rule => 
-        rule.documentType === "補助金申請書" || 
-        (rule.subsidyKeywords && rule.subsidyKeywords.length > 0)
-      );
-      if (subsidyRule) {
-        return subsidyRule;
-      }
-    }
-    
-    // 文書タイプによる直接マッチング
-    const matchingRule = rules.find(rule => rule.documentType === docType);
-    if (matchingRule) {
-      return matchingRule;
-    }
-    
-    // デフォルトルール
-    return rules.find(rule => rule.processingRoute === "electronic") || rules[0];
-  };
-
+  
   const targetDocuments = existingDocuments.filter(doc => isInMigrationScope(doc, migrationScope));
   let migratedCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
   const updatedRoutes: RouteUpdate[] = [];
-
+  
   for (const document of targetDocuments) {
     try {
-      const newClassification = applyNewRules(document, newClassificationRules);
+      const newClassification = applyNewRulesInternal(document, newClassificationRules);
       if (newClassification.processingRoute !== document.current_processing_route) {
         updatedRoutes.push({
-          documentId: document.id,
-          oldRoute: document.current_processing_route,
+          documentId: document.id, 
+          oldRoute: document.current_processing_route, 
           newRoute: newClassification.processingRoute
         });
         migratedCount++;
@@ -278,7 +265,7 @@ export function migrateExistingDataToNewClassification(
       errorCount++;
     }
   }
-
+  
   return { migratedCount, skippedCount, errorCount, updatedRoutes };
 }
 
@@ -312,14 +299,14 @@ export function setApproverAuthorityLevel(
   return { requiredAuthorityLevel, approverRoles, escalationRequired };
 }
 
-function getApproversByLevel(approvalLevel: string, department: string): string[] {
+function getApproversByLevel(approvalLevel: string, applicantDepartment: string): string[] {
   switch (approvalLevel) {
     case "課長承認":
       return ["課長"];
     case "部長承認":
       return ["部長"];
     case "理事承認":
-      return ["理事"];
+      return ["部長", "理事"];
     default:
       return [];
   }
@@ -334,12 +321,12 @@ export function determineApprovalHierarchy(
     throw new Error("申請金額は1円以上で入力してください");
   }
   
-  if (applicationAmount > 100000000) {
-    console.warn("高額申請のため、理事会での特別承認が必要になる可能性があります");
-  }
-  
   if (!applicantDepartment || applicantDepartment.trim() === "") {
     throw new Error("承認ルート設定のため、所属部署を入力してください");
+  }
+  
+  if (applicationAmount > 100000000) {
+    console.warn("高額申請のため、理事会での特別承認が必要になる可能性があります");
   }
 
   let approvalLevel = "";
@@ -376,12 +363,24 @@ function addBusinessDays(startDate: Date, businessDays: number): Date {
   const result = new Date(startDate.getTime());
   let daysToAdd = businessDays;
   
-  while (daysToAdd > 0) {
+  // 小数点がある場合は時間も計算
+  const wholeDays = Math.floor(daysToAdd);
+  const fractionalDay = daysToAdd - wholeDays;
+  
+  let addedDays = 0;
+  while (addedDays < wholeDays) {
     result.setDate(result.getDate() + 1);
     const dayOfWeek = result.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 土日以外
-      daysToAdd--;
+    // 土曜日(6)と日曜日(0)以外は営業日
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++;
     }
+  }
+  
+  // 小数部分を時間として追加
+  if (fractionalDay > 0) {
+    const hoursToAdd = fractionalDay * 24;
+    result.setHours(result.getHours() + hoursToAdd);
   }
   
   return result;
@@ -393,17 +392,18 @@ export function setApprovalDeadline(
   urgencyLevel: string,
   submissionDate: Date
 ): { deadlineDate: Date; businessDays: number; notificationSchedule: string[] } {
-  // 提出日の検証
+  // 提出日が未来の日付でないかチェック
   const now = new Date();
   if (submissionDate > now) {
     throw new Error("提出日は現在日時以前である必要があります");
   }
-
+  
   // 緊急度レベルの検証
-  if (!["高", "標準", "低"].includes(urgencyLevel)) {
+  const validUrgencyLevels = ["高", "標準", "低"];
+  if (!validUrgencyLevels.includes(urgencyLevel)) {
     throw new Error("緊急度は「高」「標準」「低」のいずれかを選択してください");
   }
-
+  
   let baseDays = subsidyRelated ? 5 : 3;
   
   if (urgencyLevel === "高") {
@@ -411,10 +411,10 @@ export function setApprovalDeadline(
   } else if (urgencyLevel === "低") {
     baseDays = baseDays * 1.5;
   }
-
+  
   const deadlineDate = addBusinessDays(submissionDate, baseDays);
   const businessDays = baseDays;
   const notificationSchedule = ["2日前", "当日"];
-
+  
   return { deadlineDate, businessDays, notificationSchedule };
 }
