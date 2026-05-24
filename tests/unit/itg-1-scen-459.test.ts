@@ -3,29 +3,48 @@ import { handleApproverAbsenceSubstitution } from "../../src/logic/it-1-br-17792
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
   test("承認者不在時に代理承認者に権限が移譲される", () => {
     // SCEN-459
-
-    // 承認者が3営業日以上不在の場合
-    const lastLoginDate = new Date("2024-01-01");
-    const currentDate = new Date("2024-01-05");
-    const result1 = handleApproverAbsenceSubstitution("EMP001", "APP001", lastLoginDate, currentDate);
     
-    expect(result1.substitutionRequired).toBe(true);
-    expect(result1.substituteApproverId).toBe("EMP002");
-    expect(result1.notificationSent).toBe(true);
-    expect(result1.reason).toBe("承認者不在のため代理承認に移行");
-
-    // 承認者が3営業日未満の不在の場合
-    const recentLoginDate = new Date("2024-01-04");
-    const result2 = handleApproverAbsenceSubstitution("EMP001", "APP001", recentLoginDate, currentDate);
+    // 承認者が3営業日以上不在の場合の代理権限移譲
+    const currentDate = new Date("2024-01-10T09:00:00Z");
+    const lastLoginDate3Days = new Date("2024-01-05T17:00:00Z");
     
-    expect(result2.substitutionRequired).toBe(false);
-    expect(result2.substituteApproverId).toBe(null);
-    expect(result2.notificationSent).toBe(false);
-    expect(result2.reason).toBe("承認者は通常通り対応可能");
-
+    const result3Days = handleApproverAbsenceSubstitution(
+      "approver001",
+      "app123",
+      lastLoginDate3Days,
+      currentDate
+    );
+    
+    expect(result3Days.substitutionRequired).toBe(true);
+    expect(result3Days.substituteApproverId).toBe("substitute_approver_001");
+    expect(result3Days.notificationSent).toBe(true);
+    expect(result3Days.reason).toBe("承認者不在のため代理承認に移行");
+    
+    // 承認者が3営業日未満の場合は代理権限移譲なし
+    const lastLoginDate2Days = new Date("2024-01-08T17:00:00Z");
+    
+    const result2Days = handleApproverAbsenceSubstitution(
+      "approver002",
+      "app124",
+      lastLoginDate2Days,
+      currentDate
+    );
+    
+    expect(result2Days.substitutionRequired).toBe(false);
+    expect(result2Days.substituteApproverId).toBe(null);
+    expect(result2Days.notificationSent).toBe(false);
+    expect(result2Days.reason).toBe("承認者は通常通り対応可能");
+    
     // 代理承認者が設定されていない場合のエラー
+    const lastLoginDate5Days = new Date("2024-01-04T17:00:00Z");
+    
     expect(() => {
-      handleApproverAbsenceSubstitution("EMP999", "APP001", lastLoginDate, currentDate);
-    }).toThrow("承認者の代理設定が行われていないため、代理承認を実行できません。システム管理者にお問い合わせください。");
+      handleApproverAbsenceSubstitution(
+        "approver_no_substitute",
+        "app125",
+        lastLoginDate5Days,
+        currentDate
+      );
+    }).toThrow("代理承認者が設定されていません");
   });
 });

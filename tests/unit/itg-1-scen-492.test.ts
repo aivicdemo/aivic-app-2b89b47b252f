@@ -3,13 +3,16 @@ import { updateProcessingRoutesByRegulationChange } from "../../src/logic/it-1-b
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
   test("法令改正通知に基づいて処理ルートが正しく更新される", () => {
     // SCEN-492
-    const regulationChangeNotice = "文部科学省からの法令改正通知により、補助金申請書類の保管要件が変更されました。補助金関連の設備費申請については紙保管が必須となります。";
+
+    const regulationChangeNotice = "文部科学省告示第123号：補助金申請書類および実績報告書について、令和6年4月1日より電子保存に加えて紙媒体での7年間保管を義務付ける";
+    
     const currentDocumentClassification = [
-      { documentType: "設備費申請", processingRoute: "electronic", paperRequired: false },
-      { documentType: "一般事務申請", processingRoute: "electronic", paperRequired: false },
-      { documentType: "人事申請", processingRoute: "electronic", paperRequired: false }
+      { documentType: "補助金申請書", processingRoute: "electronic", paperStorageRequired: false },
+      { documentType: "実績報告書", processingRoute: "electronic", paperStorageRequired: false },
+      { documentType: "一般申請書", processingRoute: "electronic", paperStorageRequired: false }
     ];
-    const affectedDocumentTypes = ["設備費申請"];
+
+    const affectedDocumentTypes = ["補助金申請書", "実績報告書"];
 
     const result = updateProcessingRoutesByRegulationChange(
       regulationChangeNotice,
@@ -17,14 +20,27 @@ describe("処理ルート変更時に関係者へ自動通知し承認フロー�
       affectedDocumentTypes
     );
 
-    expect(result.updatedRoutes).toEqual([
-      { documentType: "設備費申請", oldRoute: "electronic", newRoute: "hybrid" }
-    ]);
-    expect(result.notificationTargets).toEqual(["関係部署担当者", "システム管理者"]);
-    expect(result.changeLog).toEqual({
-      timestamp: expect.any(Date),
-      changes: [{ documentType: "設備費申請", oldRoute: "electronic", newRoute: "hybrid" }],
-      regulation: regulationChangeNotice
-    });
+    const expectedUpdatedRoutes = [
+      { documentType: "補助金申請書", oldRoute: "electronic", newRoute: "hybrid" },
+      { documentType: "実績報告書", oldRoute: "electronic", newRoute: "hybrid" }
+    ];
+
+    const expectedNotificationTargets = [
+      "広報課職員",
+      "各学部事務職員",
+      "情報システム課職員",
+      "事務局長"
+    ];
+
+    const expectedChangeLog = {
+      changeDate: expect.any(Date),
+      affectedDocumentTypes: ["補助金申請書", "実績報告書"],
+      regulationSource: "文部科学省告示第123号",
+      changeType: "紙保管義務化"
+    };
+
+    expect(result.updatedRoutes).toEqual(expectedUpdatedRoutes);
+    expect(result.notificationTargets).toEqual(expectedNotificationTargets);
+    expect(result.changeLog).toEqual(expectedChangeLog);
   });
 });

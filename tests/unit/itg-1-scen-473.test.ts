@@ -1,63 +1,68 @@
-import { checkMoeComplianceRequirements } from "../../src/logic/it-1-br-2-1-1";
+import { determineDocumentTypeAndRoute } from "../../src/logic/it-1-br-2-1-1";
 
 describe("申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能", () => {
   test("判定困難な内容の場合、適切なデフォルト処理が実行される", () => {
     // SCEN-473
     
-    // 判定困難な内容（短すぎるタイトル）のエラーケース
-    expect(() => checkMoeComplianceRequirements(
-      "短い",
-      "申請書類の内容は50文字以上で詳しく記載してください申請書類の内容は50文字以上で詳しく記載してください",
-      "一般申請",
-      ["補助金", "助成金", "文部科学省", "科研費"]
-    )).toThrow("申請書類のタイトルは10文字以上で入力してください");
-    
-    // 判定困難な内容（短すぎる内容）のエラーケース
-    expect(() => checkMoeComplianceRequirements(
-      "申請書類のタイトルは10文字以上",
-      "短い",
-      "一般申請",
-      ["補助金", "助成金", "文部科学省", "科研費"]
-    )).toThrow("申請書類の内容は50文字以上で入力してください");
-    
-    // 判定困難な内容（曖昧なキーワード）の正常処理
-    const result1 = checkMoeComplianceRequirements(
-      "業務改善に関する提案について",
-      "当部署における業務効率化のための改善提案を記載いたします。現在の作業フローを見直し、より効率的な運用を目指したいと考えております。",
-      "一般申請",
-      ["補助金", "助成金", "文部科学省", "科研費"]
+    // 判定困難な内容（キーワード不足、内容不明確）のケース
+    const result1 = determineDocumentTypeAndRoute(
+      "申請書類",
+      "内容が不明確で判定が困難な書類です",
+      "一般"
     );
     
-    // キーワード一致度が60%未満で補助金関連度が低い場合の期待値
     expect(result1).toEqual({
-      complianceStatus: "review_required",
-      paperStorageRequired: false,
+      documentType: "一般申請",
       processingRoute: "electronic",
-      riskLevel: "low"
+      subsidyRelated: false,
+      paperStorageRequired: false
     });
-    
-    // 部分的にキーワードが含まれる境界ケース
-    const result2 = checkMoeComplianceRequirements(
-      "研究活動支援のための設備導入申請",
-      "研究活動を支援するための新しい設備の導入を申請いたします。この設備により研究の効率化が期待されます。大学の研究環境向上に寄与する重要な投資です。",
-      "設備申請",
-      ["補助金", "助成金", "文部科学省", "科研費"]
+
+    // 空に近い内容でのデフォルト処理
+    const result2 = determineDocumentTypeAndRoute(
+      "書類のタイトル",
+      "内容があまり記載されていない書類について",
+      "事務"
     );
     
-    // キーワード一致度が中程度（40-60%）の場合の期待値
     expect(result2).toEqual({
-      complianceStatus: "review_required",
-      paperStorageRequired: false,
-      processingRoute: "electronic",
-      riskLevel: "medium"
+      documentType: "事務関連",
+      processingRoute: "electronic", 
+      subsidyRelated: false,
+      paperStorageRequired: false
     });
+
+    // 境界値テスト（補助金関連キーワードが不十分）
+    const result3 = determineDocumentTypeAndRoute(
+      "研究に関する申請",
+      "研究活動に関連する申請書類です。費用について記載します",
+      "研究"
+    );
     
-    // 高い一致度だが文書種別が未設定の警告ケース
-    expect(() => checkMoeComplianceRequirements(
-      "文部科学省科研費補助金申請",
-      "文部科学省による科学研究費補助金の申請を行います。この補助金により重要な研究活動を推進し、学術発展に貢献したいと考えております。",
-      "",
-      ["補助金", "助成金", "文部科学省", "科研費"]
-    )).toThrow("書類種別の分類が完了していません。先に文書種別の確認を行ってください。");
+    expect(result3).toEqual({
+      documentType: "研究関連",
+      processingRoute: "electronic",
+      subsidyRelated: false,
+      paperStorageRequired: false
+    });
+
+    // 制約違反テスト - タイトルが空
+    expect(() => {
+      determineDocumentTypeAndRoute("", "内容", "一般");
+    }).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
+
+    // 制約違反テスト - 内容が短すぎる場合（警告）
+    const result4 = determineDocumentTypeAndRoute(
+      "短い申請書類",
+      "短い内容",
+      "一般"
+    );
+    
+    expect(result4).toEqual({
+      documentType: "一般申請",
+      processingRoute: "electronic",
+      subsidyRelated: false,
+      paperStorageRequired: false
+    });
   });
 });

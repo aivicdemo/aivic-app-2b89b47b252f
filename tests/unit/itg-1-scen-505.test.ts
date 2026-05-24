@@ -1,48 +1,60 @@
-import { migrateExistingDataToNewClassification } from "../../src/logic/it-1-br-1779263788059-2-1-1";
+import { migrateExistingDataToNewClassification } from '../../src/logic/it-1-br-1779263788059-2-1-1';
 
 describe("申請書類の種別を自動判別し適切な処理ルートを決定する機能", () => {
-  test("既存データ再分類処理において移行対象外データが従来ルートを維持する", () => {
+  test("既存データ再分類 - 移行対象外データが従来ルートを維持する", () => {
     // SCEN-505
+    
     const newClassificationRules = [
       {
         documentType: "補助金申請書",
-        subsidyRelated: true,
+        processingRoute: "hybrid",
         paperStorageRequired: true,
-        processingRoute: "hybrid"
+        migrationScope: "全学"
       },
       {
-        documentType: "一般申請書",
-        subsidyRelated: false,
+        documentType: "研究費申請書",
+        processingRoute: "electronic",
         paperStorageRequired: false,
-        processingRoute: "electronic"
+        migrationScope: "研究部門"
       }
     ];
 
     const existingDocuments = [
       {
-        id: "doc-001",
-        documentType: "補助金申請書",
+        id: "DOC001",
+        type: "補助金申請書",
         current_processing_route: "electronic",
-        title: "科研費申請書",
-        content: "研究費の申請です"
+        created_date: "2024-01-15",
+        department: "総務課",
+        migrationEligible: true
       },
       {
-        id: "doc-002", 
-        documentType: "人事申請書",
+        id: "DOC002",
+        type: "人事申請書",
         current_processing_route: "electronic",
-        title: "休暇申請書",
-        content: "有給休暇の申請です"
+        created_date: "2024-02-01",
+        department: "人事課",
+        migrationEligible: false
       },
       {
-        id: "doc-003",
-        documentType: "一般申請書",
-        current_processing_route: "electronic", 
-        title: "会議室使用申請",
-        content: "会議室の使用申請です"
+        id: "DOC003",
+        type: "研究費申請書",
+        current_processing_route: "hybrid",
+        created_date: "2024-01-20",
+        department: "研究支援課",
+        migrationEligible: true
+      },
+      {
+        id: "DOC004",
+        type: "一般事務申請書",
+        current_processing_route: "electronic",
+        created_date: "2024-01-25",
+        department: "学務課",
+        migrationEligible: false
       }
     ];
 
-    const migrationScope = "補助金関連文書のみ";
+    const migrationScope = "法令改正対象";
 
     const result = migrateExistingDataToNewClassification(
       newClassificationRules,
@@ -53,11 +65,12 @@ describe("申請書類の種別を自動判別し適切な処理ルートを決�
     expect(result.migratedCount).toBe(1);
     expect(result.skippedCount).toBe(2);
     expect(result.errorCount).toBe(0);
-    expect(result.updatedRoutes).toHaveLength(1);
-    expect(result.updatedRoutes[0]).toEqual({
-      documentId: "doc-001",
-      oldRoute: "electronic",
-      newRoute: "hybrid"
-    });
+    expect(result.updatedRoutes).toEqual([
+      {
+        documentId: "DOC001",
+        oldRoute: "electronic",
+        newRoute: "hybrid"
+      }
+    ]);
   });
 });

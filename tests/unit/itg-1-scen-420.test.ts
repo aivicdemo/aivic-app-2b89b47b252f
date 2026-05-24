@@ -1,85 +1,84 @@
-import { validateApplicationAmountAndPeriod } from "../../src/logic/it-1-br-2-2-1";
+import {
+  validateApplicationAmountAndPeriod
+} from "../../src/logic/it-1-br-2-2-1";
 
 describe("文書種別に応じた承認フロー自動振り分け機能", () => {
-  test("SCEN-420: 申請金額が予算上限内の場合、正常に処理される", () => {
-    // 申請金額が予算上限内の正常ケース
+  test("申請金額が予算上限内の場合、正常に処理される", () => {
+    // SCEN-420
+    
+    // 予算上限内の正常な申請金額
+    const applicationAmount = 800000;
+    const implementationStartDate = "2024-04-01";
+    const implementationEndDate = "2024-09-30";
+    const documentType = "補助金申請書";
     const budgetLimits = {
-      "補助金申請書": { minAmount: 100000, maxAmount: 5000000 },
-      "設備申請書": { minAmount: 50000, maxAmount: 3000000 }
+      "補助金申請書": { minAmount: 100000, maxAmount: 1000000 }
     };
-    
+
     const result = validateApplicationAmountAndPeriod(
-      2000000, // 申請金額（200万円）
-      "2024-04-01", // 実施開始日
-      "2024-12-31", // 実施終了日
-      "補助金申請書",
+      applicationAmount,
+      implementationStartDate,
+      implementationEndDate,
+      documentType,
       budgetLimits
     );
-    
+
+    // 予算上限内なので金額は有効
     expect(result.isAmountValid).toBe(true);
+    // 開始日が現在より後、終了日が開始日より後なので期間は有効
     expect(result.isPeriodValid).toBe(true);
+    // エラーがないので空配列
     expect(result.validationErrors).toEqual([]);
+    // 金額・期間ともに有効なので次ステップに進める
     expect(result.canProceed).toBe(true);
-    
-    // 境界値テスト - 最小金額
+
+    // 境界値テスト - 最小額
     const minAmountResult = validateApplicationAmountAndPeriod(
-      100000, // 最小金額
-      "2024-04-01",
-      "2024-12-31",
-      "補助金申請書",
+      100000,
+      implementationStartDate,
+      implementationEndDate,
+      documentType,
       budgetLimits
     );
-    
     expect(minAmountResult.isAmountValid).toBe(true);
     expect(minAmountResult.canProceed).toBe(true);
-    
-    // 境界値テスト - 最大金額
+
+    // 境界値テスト - 最大額
     const maxAmountResult = validateApplicationAmountAndPeriod(
-      5000000, // 最大金額
-      "2024-04-01",
-      "2024-12-31",
-      "補助金申請書",
+      1000000,
+      implementationStartDate,
+      implementationEndDate,
+      documentType,
       budgetLimits
     );
-    
     expect(maxAmountResult.isAmountValid).toBe(true);
     expect(maxAmountResult.canProceed).toBe(true);
-    
-    // 上限超過ケース
-    const overLimitResult = validateApplicationAmountAndPeriod(
-      6000000, // 予算上限超過
-      "2024-04-01",
-      "2024-12-31",
-      "補助金申請書",
+
+    // 予算上限超過の場合
+    expect(() => validateApplicationAmountAndPeriod(
+      1200000,
+      implementationStartDate,
+      implementationEndDate,
+      documentType,
       budgetLimits
-    );
-    
-    expect(overLimitResult.isAmountValid).toBe(false);
-    expect(overLimitResult.validationErrors).toEqual(["申請金額が規定範囲外です"]);
-    expect(overLimitResult.canProceed).toBe(false);
-    
-    // 下限未満ケース
-    const underLimitResult = validateApplicationAmountAndPeriod(
-      50000, // 予算下限未満
-      "2024-04-01",
-      "2024-12-31",
-      "補助金申請書",
+    )).toThrow("申請金額が規定範囲外です");
+
+    // 0以下の金額の場合
+    expect(() => validateApplicationAmountAndPeriod(
+      -100000,
+      implementationStartDate,
+      implementationEndDate,
+      documentType,
       budgetLimits
-    );
-    
-    expect(underLimitResult.isAmountValid).toBe(false);
-    expect(underLimitResult.validationErrors).toEqual(["申請金額が規定範囲外です"]);
-    expect(underLimitResult.canProceed).toBe(false);
-    
-    // エラーケース - 負の申請金額
-    expect(() => {
-      validateApplicationAmountAndPeriod(
-        -100000,
-        "2024-04-01",
-        "2024-12-31",
-        "補助金申請書",
-        budgetLimits
-      );
-    }).toThrow("申請金額は正の数値で入力してください");
+    )).toThrow("申請金額は正の数値で入力してください");
+
+    // 無効な日付形式の場合
+    expect(() => validateApplicationAmountAndPeriod(
+      500000,
+      "invalid-date",
+      implementationEndDate,
+      documentType,
+      budgetLimits
+    )).toThrow("実施期間は有効な日付形式で入力してください");
   });
 });

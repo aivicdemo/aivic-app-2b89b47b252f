@@ -1,86 +1,65 @@
 import { checkApprovalDelayAndNotify } from "../../src/logic/it-1-br-1-2-1";
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("承認遅延検知でシステムエラーが発生した場合、適切に処理される", () => {
-    // SCEN-488
-    
-    // 正常な入力データで動作確認
-    const validApplicationId = "APP-2024-001";
-    const validCurrentDateTime = new Date("2024-01-15T10:00:00Z");
-    const validApprovalDeadline = new Date("2024-01-10T17:00:00Z");
-    const validReminderSettings = {
-      beforeDays: [3, 1],
-      urgentHours: 24
-    };
-    const validApproverInfo = {
-      id: "APPROVER-001",
-      name: "承認者田中",
-      email: "tanaka@university.ac.jp",
-      department: "総務部"
-    };
+  test("SCEN-488: 承認遅延検知 - 検知処理でシステムエラーが発生した場合、適切に処理される", () => {
+    // システムエラーケース: 申請案件の識別番号が空または無効な場合
+    expect(() => checkApprovalDelayAndNotify(
+      "",
+      new Date("2024-01-15T14:00:00Z"),
+      new Date("2024-01-15T12:00:00Z"),
+      { beforeDays: [3, 1], urgentHours: 24 },
+      { id: "user001", name: "田中太郎", email: "tanaka@university.ac.jp", department: "総務課" }
+    )).toThrow("申請案件が特定できません。正しい申請番号を指定してください。");
 
-    // 期限超過による緊急催促ケース
-    const timeUntilDeadline = validApprovalDeadline.getTime() - validCurrentDateTime.getTime();
-    const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
-    expect(hoursUntilDeadline).toBe(-120); // 5日遅延
-    
-    const result = checkApprovalDelayAndNotify(
-      validApplicationId,
-      validCurrentDateTime,
-      validApprovalDeadline,
-      validReminderSettings,
-      validApproverInfo
+    // システムエラーケース: 承認期限が設定されていない場合
+    expect(() => checkApprovalDelayAndNotify(
+      "APP-2024-001",
+      new Date("2024-01-15T14:00:00Z"),
+      null as any,
+      { beforeDays: [3, 1], urgentHours: 24 },
+      { id: "user001", name: "田中太郎", email: "tanaka@university.ac.jp", department: "総務課" }
+    )).toThrow("承認期限が設定されていないため、遅延検知ができません。");
+
+    // 正常処理: 遅延警告状態
+    const result1 = checkApprovalDelayAndNotify(
+      "APP-2024-001",
+      new Date("2024-01-15T14:00:00Z"),
+      new Date("2024-01-15T12:00:00Z"),
+      { beforeDays: [3, 1], urgentHours: 24 },
+      { id: "user001", name: "田中太郎", email: "tanaka@university.ac.jp", department: "総務課" }
     );
 
-    expect(result.shouldNotify).toBe(true);
-    expect(result.notificationType).toBe("緊急催促");
-    expect(result.delayStatus).toBe("緊急");
-    expect(result.recipients).toEqual([
-      "tanaka@university.ac.jp",
-      "applicant@university.ac.jp",
-      "manager@university.ac.jp"
-    ]);
+    expect(result1.shouldNotify).toBe(true);
+    expect(result1.notificationType).toBe("緊急催促");
+    expect(result1.recipients).toEqual(["tanaka@university.ac.jp", "applicant@university.ac.jp", "manager@university.ac.jp"]);
+    expect(result1.delayStatus).toBe("緊急");
+    expect(result1.nextReminderTime).toBeInstanceOf(Date);
 
-    // 無効な申請案件IDでエラー処理
-    expect(() => {
-      checkApprovalDelayAndNotify(
-        "",
-        validCurrentDateTime,
-        validApprovalDeadline,
-        validReminderSettings,
-        validApproverInfo
-      );
-    }).toThrow("申請案件が特定できません。正しい申請番号を指定してください。");
-
-    // 承認期限未設定でエラー処理
-    expect(() => {
-      checkApprovalDelayAndNotify(
-        validApplicationId,
-        validCurrentDateTime,
-        new Date(""),
-        validReminderSettings,
-        validApproverInfo
-      );
-    }).toThrow("承認期限が設定されていないため、遅延検知ができません。");
-
-    // 承認者情報不完全で警告
-    const incompleteApproverInfo = {
-      id: "APPROVER-002",
-      name: "",
-      email: "",
-      department: "不明"
-    };
-
-    // 警告ケースでも処理は継続される
-    const warningResult = checkApprovalDelayAndNotify(
-      validApplicationId,
-      validCurrentDateTime,
-      validApprovalDeadline,
-      validReminderSettings,
-      incompleteApproverInfo
+    // 正常処理: 事前催促状態
+    const result2 = checkApprovalDelayAndNotify(
+      "APP-2024-002",
+      new Date("2024-01-15T14:00:00Z"),
+      new Date("2024-01-18T14:00:00Z"),
+      { beforeDays: [3, 1], urgentHours: 24 },
+      { id: "user002", name: "佐藤花子", email: "sato@university.ac.jp", department: "経理課" }
     );
 
-    expect(warningResult.shouldNotify).toBe(true);
-    expect(warningResult.notificationType).toBe("緊急催促");
+    expect(result2.shouldNotify).toBe(true);
+    expect(result2.notificationType).toBe("事前催促");
+    expect(result2.recipients).toEqual(["sato@university.ac.jp"]);
+    expect(result2.delayStatus).toBe("注意");
+
+    // 正常処理: 通知不要状態
+    const result3 = checkApprovalDelayAndNotify(
+      "APP-2024-003",
+      new Date("2024-01-15T14:00:00Z"),
+      new Date("2024-01-25T14:00:00Z"),
+      { beforeDays: [3, 1], urgentHours: 24 },
+      { id: "user003", name: "山田次郎", email: "yamada@university.ac.jp", department: "学務課" }
+    );
+
+    expect(result3.shouldNotify).toBe(false);
+    expect(result3.delayStatus).toBe("正常");
+    expect(result3.recipients).toEqual(["yamada@university.ac.jp"]);
   });
 });

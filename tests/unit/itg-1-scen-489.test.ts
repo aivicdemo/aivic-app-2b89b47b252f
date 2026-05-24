@@ -1,68 +1,71 @@
-import { checkMoeComplianceRequirements } from "../../src/logic/it-1-br-2-1-1";
+import { determineDocumentStorageMethod } from "../../src/logic/it-1-br-2-1-1";
 
 describe("申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能", () => {
   test("文書保管方式選択 - 法令要件に基づいて適切な保管方式が選択される", () => {
     // SCEN-489
-
-    // 補助金関連書類で紙保管が必要な場合
-    const subsidyDocument = checkMoeComplianceRequirements(
-      "科研費研究計画調書",
-      "本研究は文部科学省の科学研究費助成事業における基盤研究Aの申請であり、運営費交付金と合わせて設備整備費の確保を目指すものである。",
+    
+    // 補助金関連書類で紙保管が必要なケース
+    const result1 = determineDocumentStorageMethod(
+      "文部科学省科学研究費助成事業実績報告書",
+      "本研究では科研費補助金を活用し、運営費交付金と合わせて設備整備費の執行を行いました。",
       "補助金申請書",
-      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金", "文部科学省"]
+      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金"]
     );
+    
+    expect(result1).toEqual({
+      documentType: "補助金申請書",
+      processingRoute: "hybrid",
+      subsidyRelated: true,
+      paperStorageRequired: true
+    });
 
-    const keywordScore = (6 / 6) * 1.0;
-    const isSubsidyRelated = keywordScore >= 0.6;
-    expect(subsidyDocument.complianceStatus).toBe("compliant");
-    expect(subsidyDocument.paperStorageRequired).toBe(true);
-    expect(subsidyDocument.processingRoute).toBe("hybrid");
-    expect(subsidyDocument.riskLevel).toBe("high");
-
-    // 一般書類で電子のみ処理の場合
-    const generalDocument = checkMoeComplianceRequirements(
-      "会議資料作成依頼",
-      "次回の教授会で使用する会議資料の作成をお願いします。議題は人事案件と予算についてです。",
-      "一般事務書類",
-      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金", "文部科学省"]
+    // 一般申請書類で電子のみ処理のケース
+    const result2 = determineDocumentStorageMethod(
+      "備品購入申請書",
+      "教室用机・椅子の購入を申請いたします。数量は机20台、椅子40脚です。",
+      "一般申請",
+      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金"]
     );
+    
+    expect(result2).toEqual({
+      documentType: "一般申請",
+      processingRoute: "electronic",
+      subsidyRelated: false,
+      paperStorageRequired: false
+    });
 
-    const generalKeywordScore = 0 / 6;
-    const isGeneralSubsidyRelated = generalKeywordScore >= 0.6;
-    expect(generalDocument.complianceStatus).toBe("review_required");
-    expect(generalDocument.paperStorageRequired).toBe(false);
-    expect(generalDocument.processingRoute).toBe("electronic");
-    expect(generalDocument.riskLevel).toBe("low");
-
-    // 研究関連書類（補助金関連度中程度）の場合
-    const researchDocument = checkMoeComplianceRequirements(
-      "研究設備導入計画書",
-      "新しい研究設備の導入に関する計画書です。実験効率の向上を図ることを目的とします。",
-      "研究関連書類", 
-      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金", "文部科学省"]
+    // 補助金関連だが文部科学省要件に該当しないケース
+    const result3 = determineDocumentStorageMethod(
+      "研究費使用に関する問い合わせ",
+      "科研費の使用方法について確認したい事項があります。補助金の適切な執行について教えてください。",
+      "問い合わせ文書",
+      ["科研費", "運営費交付金", "設備整備費", "補助金", "助成金"]
     );
+    
+    expect(result3).toEqual({
+      documentType: "問い合わせ文書",
+      processingRoute: "electronic",
+      subsidyRelated: true,
+      paperStorageRequired: false
+    });
 
-    const researchKeywordScore = (1 / 6) * 1.0;
-    const isResearchSubsidyRelated = researchKeywordScore >= 0.6;
-    expect(researchDocument.complianceStatus).toBe("review_required");
-    expect(researchDocument.paperStorageRequired).toBe(false);
-    expect(researchDocument.processingRoute).toBe("electronic");
-    expect(researchDocument.riskLevel).toBe("medium");
-
-    // エラーケース：タイトルが空
-    expect(() => checkMoeComplianceRequirements(
+    // エラーケース: タイトルが空の場合
+    expect(() => determineDocumentStorageMethod(
       "",
       "申請内容",
-      "補助金申請書",
-      ["科研費"]
-    )).toThrow("申請書類のタイトルが入力されていません。法令要件の判定ができません。");
+      "申請書",
+      ["補助金"]
+    )).toThrow("申請書類のタイトルが入力されていません。タイトルを入力してください。");
 
-    // エラーケース：文書種別が未分類
-    expect(() => checkMoeComplianceRequirements(
-      "テスト申請書",
-      "テスト内容です。",
-      "",
-      ["科研費"]
-    )).toThrow("書類種別の分類が完了していません。先に文書種別の確認を行ってください。");
+    // 警告ケース: 内容が短すぎる場合
+    console.warn = jest.fn();
+    const result4 = determineDocumentStorageMethod(
+      "短い申請書",
+      "短い内容",
+      "申請書",
+      ["補助金"]
+    );
+    
+    expect(console.warn).toHaveBeenCalledWith("申請内容が短すぎる可能性があります。内容を確認してください。");
   });
 });

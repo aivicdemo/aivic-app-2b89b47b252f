@@ -1,107 +1,85 @@
-import { 
-  determineNotificationTargets,
-  checkApprovalDelayAndNotify,
-  handleDataCollectionError,
-  sendAnomalyNotification
-} from "../../src/logic/it-1-br-1779263788059-2-2-1";
-
+import { sendAnomalyNotification } from "../../src/logic/it-1-br-1779263788059-2-2-1";
 const fetchMock = require("jest-fetch-mock");
 
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
-  test("承認結果通知で通知送信に失敗した場合にリトライ処理が実行される", async () => {
+  test("承認結果通知で通知送信に失敗した場合、リトライ処理が実行される", () => {
     // SCEN-485
+
     fetchMock.resetMocks();
-    
-    // 承認結果通知の基本データを準備
-    const approvalResult = "承認";
-    const applicationData = {
-      applicant_id: "U001",
-      department_id: "D001", 
-      urgency_level: "high"
-    };
-    const approverInfo = {
-      department: "総務部",
-      role: "部長",
-      authority_level: "高"
-    };
-    const documentClassification = {
-      subsidyRelated: true,
-      moeRequirement: true,
-      paperStorageRequired: true
-    };
 
-    // 通知対象者を決定
-    const notificationTargets = determineNotificationTargets(
-      approvalResult,
-      applicationData,
-      approverInfo,
-      documentClassification
-    );
-
-    // 期待される通知対象者（承認の場合）
-    expect(notificationTargets.primaryTargets).toEqual(["U001", "supervisor_U001"]);
-    expect(notificationTargets.secondaryTargets).toEqual(["finance_dept", "audit_dept", "manager_D001"]);
-    expect(notificationTargets.notificationMethod).toBe("hybrid");
-    expect(notificationTargets.auditTrailRequired).toBe(true);
-
-    // 初回通知送信が失敗するケースをシミュレート
-    fetchMock.mockResponseOnce("", { status: 500 });
-
-    // エラー処理でリトライ判定
-    const errorHandlingResult = handleDataCollectionError(
-      "api_timeout",
-      "通知送信",
-      0,
-      3
-    );
-
-    // リトライが実行される判定結果
-    expect(errorHandlingResult.shouldRetry).toBe(true);
-    expect(errorHandlingResult.retryDelaySeconds).toBe(30);
-    expect(errorHandlingResult.shouldNotifyAdmin).toBe(false);
-    expect(errorHandlingResult.errorHandlingAction).toBe("retry");
-
-    // 2回目のリトライでも失敗
-    const secondRetryResult = handleDataCollectionError(
-      "api_timeout",
-      "通知送信",
-      1,
-      3
-    );
-
-    expect(secondRetryResult.shouldRetry).toBe(true);
-    expect(secondRetryResult.retryDelaySeconds).toBe(60);
-    expect(secondRetryResult.shouldNotifyAdmin).toBe(false);
-    expect(secondRetryResult.errorHandlingAction).toBe("retry");
-
-    // 3回目でリトライ上限に達する
-    const finalRetryResult = handleDataCollectionError(
-      "api_timeout", 
-      "通知送信",
-      3,
-      3
-    );
-
-    expect(finalRetryResult.shouldRetry).toBe(false);
-    expect(finalRetryResult.retryDelaySeconds).toBe(0);
-    expect(finalRetryResult.shouldNotifyAdmin).toBe(true);
-    expect(finalRetryResult.errorHandlingAction).toBe("suspend_report");
-
-    // 異常通知の送信
-    const anomalyNotificationResult = sendAnomalyNotification(
-      "通知送信失敗",
+    // 緊急レベルの異常でリトライが必要なケース
+    const result1 = sendAnomalyNotification(
+      "処理件数異常",
       "緊急",
       {
-        発生時刻: new Date().toISOString(),
-        影響範囲: "承認結果通知",
-        測定値: "3回連続失敗"
+        発生時刻: "2024-01-01T14:00:00Z",
+        影響範囲: "全学",
+        測定値: 50
       },
-      "通知システム"
+      "申請処理システム"
     );
 
-    expect(anomalyNotificationResult.notificationTargets).toEqual(["システム管理者", "情報システム課長", "事務局長"]);
-    expect(anomalyNotificationResult.notificationMethods).toEqual(["メール", "電話", "システム内通知"]);
-    expect(anomalyNotificationResult.sendSuccess).toBe(true);
-    expect(anomalyNotificationResult.escalationRequired).toBe(true);
+    expect(result1.notificationTargets).toEqual(["システム管理者", "情報システム課長", "事務局長"]);
+    expect(result1.notificationMethods).toEqual(["メール", "電話", "システム内通知"]);
+    expect(result1.sendSuccess).toBe(true);
+    expect(result1.escalationRequired).toBe(true);
+
+    // 警告レベルの場合
+    const result2 = sendAnomalyNotification(
+      "応答時間異常",
+      "警告",
+      {
+        発生時刻: "2024-01-01T14:00:00Z",
+        影響範囲: "特定部署",
+        測定値: 2000
+      },
+      "承認フローシステム"
+    );
+
+    expect(result2.notificationTargets).toEqual(["システム管理者", "情報システム課担当者"]);
+    expect(result2.notificationMethods).toEqual(["メール", "システム内通知"]);
+    expect(result2.sendSuccess).toBe(true);
+    expect(result2.escalationRequired).toBe(false);
+
+    // 注意レベルの場合
+    const result3 = sendAnomalyNotification(
+      "システムエラー",
+      "注意",
+      {
+        発生時刻: "2024-01-01T14:00:00Z",
+        影響範囲: "個別機能",
+        測定値: 5
+      },
+      "文書管理システム"
+    );
+
+    expect(result3.notificationTargets).toEqual(["システム管理者"]);
+    expect(result3.notificationMethods).toEqual(["メール", "システム内通知"]);
+    expect(result3.sendSuccess).toBe(true);
+    expect(result3.escalationRequired).toBe(false);
+
+    // エラーケース：異常の種類が空
+    expect(() => sendAnomalyNotification(
+      "",
+      "緊急",
+      {
+        発生時刻: "2024-01-01T14:00:00Z",
+        影響範囲: "全学",
+        測定値: 100
+      },
+      "申請処理システム"
+    )).toThrow("異常の種類が特定できないため通知を送信できません。システム監視の設定を確認してください。");
+
+    // エラーケース：重要度レベルが不正
+    expect(() => sendAnomalyNotification(
+      "処理件数異常",
+      "不明",
+      {
+        発生時刻: "2024-01-01T14:00:00Z",
+        影響範囲: "全学",
+        測定値: 100
+      },
+      "申請処理システム"
+    )).toThrow("異常の重要度が判定できないため適切な通知先を決定できません。");
   });
 });

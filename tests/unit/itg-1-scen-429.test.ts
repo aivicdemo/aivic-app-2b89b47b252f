@@ -3,18 +3,16 @@ import { validateApplicationBeforeSubmission } from "../../src/logic/it-1-br-177
 describe("申請書類の種別を自動判別し適切な処理ルートを決定する機能", () => {
   test("すべての検証項目を満たす申請書類が正常に提出される", () => {
     // SCEN-429
-    
-    // 正常な申請書類データ
-    const documentTitle = "令和5年度科学研究費助成事業申請書";
-    const documentContent = "本申請は文部科学省の科学研究費助成事業に基づく研究計画書として提出します。研究目的は量子コンピューティングの実用化に向けた基盤技術の開発であり、3年間の計画で実施予定です。";
-    const documentType = "補助金申請書";
+    const documentTitle = "令和6年度科学研究費助成事業申請書";
+    const documentContent = "本研究は、地域社会の持続可能な発展を目指し、環境保護と経済発展の両立を図る新しいアプローチを提案するものです。具体的には、地域資源を活用した循環型経済システムの構築を通じて、住民の生活の質の向上と環境負荷の軽減を同時に実現することを目的としています。";
+    const documentType = "subsidy";
     const processingRoute = "hybrid";
-    const approvalRoute = ["課長", "部長", "理事"];
+    const approvalRoute = ["課長", "部長", "事務局長"];
     const requiredFields = {
       "申請者名": "田中太郎",
-      "研究期間": "2023-04-01から2026-03-31",
-      "申請金額": "5000000円",
-      "所属部署": "工学部"
+      "所属部署": "研究推進課",
+      "申請金額": "5000000",
+      "実施期間": "2024年4月1日～2025年3月31日"
     };
 
     const result = validateApplicationBeforeSubmission(
@@ -26,8 +24,10 @@ describe("申請書類の種別を自動判別し適切な処理ルートを決�
       requiredFields
     );
 
-    expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([]);
+    expect(result).toEqual({
+      isValid: true,
+      errors: [],
+      warnings: []
+    });
   });
 });

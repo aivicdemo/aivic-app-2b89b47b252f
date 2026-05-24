@@ -1,67 +1,104 @@
 import { determineNotificationTargets } from "../../src/logic/it-1-br-1779263788059-2-2-1";
 
+const fetchMock = require("jest-fetch-mock");
+
 describe("処理ルート変更時に関係者へ自動通知し承認フローを動的に調整する機能", () => {
-  test("承認結果通知 - 承認完了時に関係者に適切な通知が送信される", () => {
+  beforeEach(() => {
+    fetchMock.resetMocks();
+  });
+
+  test("承認完了時に申請者と関係者に適切な通知が送信される", () => {
     // SCEN-483
     
-    // 承認案件（補助金関連、緊急度高）
-    const approvalResult = "approved";
+    // 承認結果が「承認」の場合
     const applicationData = {
-      applicant_id: "staff001",
-      department_id: "research_dept",
-      urgency_level: "high"
+      applicant_id: "applicant001",
+      department_id: "dept001",
+      urgency_level: "normal"
     };
     const approverInfo = {
-      department: "admin_office",
-      position: "section_chief",
-      authority_level: "standard"
+      position: "department_head",
+      department: "総務課",
+      authority_level: "high"
     };
     const documentClassification = {
-      subsidyRelated: true,
-      moeRequirement: true,
-      paperStorageRequired: true
-    };
-
-    const result = determineNotificationTargets(approvalResult, applicationData, approverInfo, documentClassification);
-
-    expect(result.primaryTargets).toEqual(["staff001", "supervisor_of_staff001"]);
-    expect(result.secondaryTargets).toEqual(["finance_dept", "audit_dept", "research_dept_manager"]);
-    expect(result.notificationMethod).toBe("hybrid");
-    expect(result.auditTrailRequired).toBe(true);
-
-    // 却下案件（一般申請、緊急度中）
-    const rejectionResult = "rejected";
-    const generalApplicationData = {
-      applicant_id: "staff002",
-      department_id: "general_affairs",
-      urgency_level: "medium"
-    };
-    const generalDocumentClassification = {
       subsidyRelated: false,
       moeRequirement: false,
       paperStorageRequired: false
     };
 
-    const rejectionNotification = determineNotificationTargets(rejectionResult, generalApplicationData, approverInfo, generalDocumentClassification);
+    const result = determineNotificationTargets(
+      "approved",
+      applicationData,
+      approverInfo,
+      documentClassification
+    );
 
-    expect(rejectionNotification.primaryTargets).toEqual(["staff002", "supervisor_of_staff002", "general_affairs_admin"]);
-    expect(rejectionNotification.secondaryTargets).toEqual([]);
-    expect(rejectionNotification.notificationMethod).toBe("electronic");
-    expect(rejectionNotification.auditTrailRequired).toBe(false);
+    expect(result.primaryTargets).toEqual(["applicant001", "supervisor001"]);
+    expect(result.secondaryTargets).toEqual([]);
+    expect(result.notificationMethod).toBe("electronic");
+    expect(result.auditTrailRequired).toBe(false);
 
-    // 差し戻し案件（補助金関連、緊急度低）
-    const returnResult = "returned";
+    // 却下または差し戻しの場合
+    const rejectionResult = determineNotificationTargets(
+      "rejected",
+      applicationData,
+      approverInfo,
+      documentClassification
+    );
+
+    expect(rejectionResult.primaryTargets).toEqual(["applicant001", "supervisor001", "admin_support001"]);
+    expect(rejectionResult.secondaryTargets).toEqual([]);
+    expect(rejectionResult.notificationMethod).toBe("electronic");
+
+    // 補助金関連書類の場合
     const subsidyApplicationData = {
-      applicant_id: "staff003",
-      department_id: "finance_dept",
-      urgency_level: "low"
+      applicant_id: "applicant002",
+      department_id: "dept002",
+      urgency_level: "high"
+    };
+    const subsidyDocumentClassification = {
+      subsidyRelated: true,
+      moeRequirement: true,
+      paperStorageRequired: true
     };
 
-    const returnNotification = determineNotificationTargets(returnResult, subsidyApplicationData, approverInfo, documentClassification);
+    const subsidyResult = determineNotificationTargets(
+      "approved",
+      subsidyApplicationData,
+      approverInfo,
+      subsidyDocumentClassification
+    );
 
-    expect(returnNotification.primaryTargets).toEqual(["staff003", "supervisor_of_staff003", "finance_dept_admin"]);
-    expect(returnNotification.secondaryTargets).toEqual(["finance_dept", "audit_dept"]);
-    expect(returnNotification.notificationMethod).toBe("hybrid");
-    expect(returnNotification.auditTrailRequired).toBe(true);
+    expect(subsidyResult.primaryTargets).toEqual(["applicant002", "supervisor002"]);
+    expect(subsidyResult.secondaryTargets).toEqual(["finance_dept", "audit_dept", "manager002"]);
+    expect(subsidyResult.notificationMethod).toBe("hybrid");
+    expect(subsidyResult.auditTrailRequired).toBe(true);
+
+    // 申請者情報が取得できない場合
+    const invalidApplicationData = {
+      applicant_id: "",
+      department_id: "dept001",
+      urgency_level: "normal"
+    };
+
+    expect(() => {
+      determineNotificationTargets(
+        "approved",
+        invalidApplicationData,
+        approverInfo,
+        documentClassification
+      );
+    }).toThrow("申請者の情報が見つからないため、処理結果を通知できません。システム管理者にお問い合わせください。");
+
+    // 承認判断結果が不正な場合
+    expect(() => {
+      determineNotificationTargets(
+        "invalid_status",
+        applicationData,
+        approverInfo,
+        documentClassification
+      );
+    }).toThrow("承認判断の結果が正しく設定されていません。再度承認処理を行ってください。");
   });
 });

@@ -1,81 +1,80 @@
 import { determineNotificationTiming } from "../../src/logic/it-1-br-1-2-1";
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("承認者への通知タイミングが業務負荷と緊急度に基づいて制御され、過度な通知頻度が制限される", () => {
+  test("承認者への通知タイミングが業務負荷と緊急度に応じて適切に制御される", () => {
     // SCEN-469
-    const currentTime = new Date("2024-01-15T10:00:00Z");
-    const lastNotificationTime = new Date("2024-01-15T09:45:00Z");
-
-    // 高優先度案件で通知後30分未満の場合（通常は抑制されるが緊急案件は通知される）
-    const urgentApplication = {
-      id: "APP001",
-      priority: "high",
-      createdAt: new Date("2024-01-14T10:00:00Z")
-    };
-    const pendingApplicationsUrgent = [urgentApplication];
+    
+    // 高優先度案件で業務負荷が高い場合の通知制御
+    const highPriorityApplications = [
+      { priority: "high", createdAt: new Date("2024-01-01T09:00:00Z") }
+    ];
+    const highWorkload = 85;
+    const lastNotification = new Date("2024-01-01T09:15:00Z");
     
     const result1 = determineNotificationTiming(
-      pendingApplicationsUrgent,
-      50,
-      lastNotificationTime,
+      highPriorityApplications,
+      highWorkload,
+      lastNotification,
       "high"
     );
     
-    // 緊急案件で24時間超過のため即座に通知
+    // 高優先度は即座通知だが、高負荷時は頻度調整
     expect(result1.shouldSendNotification).toBe(true);
     expect(result1.notificationFrequency).toBe("immediate");
+    expect(result1.nextNotificationTime).toEqual(new Date("2024-01-01T09:15:00Z"));
     
-    // 中優先度案件で30分経過後
-    const lastNotificationTime2 = new Date("2024-01-15T09:15:00Z");
-    const mediumApplication = {
-      id: "APP002", 
-      priority: "medium",
-      createdAt: new Date("2024-01-15T08:00:00Z")
-    };
-    const pendingApplicationsMedium = [mediumApplication];
+    // 中優先度案件で通常負荷の場合
+    const mediumPriorityApplications = [
+      { priority: "medium", createdAt: new Date("2024-01-01T08:00:00Z") }
+    ];
+    const normalWorkload = 50;
+    const lastNotificationMedium = new Date("2024-01-01T08:00:00Z");
     
     const result2 = determineNotificationTiming(
-      pendingApplicationsMedium,
-      40,
-      lastNotificationTime2,
+      mediumPriorityApplications,
+      normalWorkload,
+      lastNotificationMedium,
       "medium"
     );
     
-    // 中優先度は60分間隔、業務負荷80%未満なので調整なし
+    // 中優先度は1時間後通知
     expect(result2.shouldSendNotification).toBe(true);
     expect(result2.notificationFrequency).toBe("60minutes");
-    expect(result2.nextNotificationTime).toEqual(new Date("2024-01-15T11:00:00Z"));
+    expect(result2.nextNotificationTime).toEqual(new Date("2024-01-01T09:00:00Z"));
     
-    // 業務負荷が高い場合の頻度調整
+    // 低優先度案件で高負荷時の頻度抑制
+    const lowPriorityApplications = [
+      { priority: "low", createdAt: new Date("2024-01-01T06:00:00Z") }
+    ];
+    const veryHighWorkload = 90;
+    const lastNotificationLow = new Date("2024-01-01T06:00:00Z");
+    
     const result3 = determineNotificationTiming(
-      pendingApplicationsMedium,
-      85,
-      lastNotificationTime2,
-      "medium"
-    );
-    
-    // 業務負荷80%超のため通知頻度を半分に調整（60分→120分）
-    expect(result3.notificationFrequency).toBe("120minutes");
-    expect(result3.nextNotificationTime).toEqual(new Date("2024-01-15T12:00:00Z"));
-    
-    // 低優先度案件での通知抑制
-    const recentNotification = new Date("2024-01-15T09:50:00Z");
-    const lowApplication = {
-      id: "APP003",
-      priority: "low", 
-      createdAt: new Date("2024-01-15T09:00:00Z")
-    };
-    const pendingApplicationsLow = [lowApplication];
-    
-    const result4 = determineNotificationTiming(
-      pendingApplicationsLow,
-      30,
-      recentNotification,
+      lowPriorityApplications,
+      veryHighWorkload,
+      lastNotificationLow,
       "low"
     );
     
-    // 最後の通知から10分しか経過しておらず、緊急案件でもないため通知抑制
+    // 低優先度は通常3時間後だが、高負荷時は頻度を半分に調整（270分 = 180 * 1.5）
+    expect(result3.shouldSendNotification).toBe(true);
+    expect(result3.notificationFrequency).toBe("270minutes");
+    expect(result3.nextNotificationTime).toEqual(new Date("2024-01-01T10:30:00Z"));
+    
+    // 最後の通知から30分以内の場合の通知抑制
+    const recentNotification = new Date("2024-01-01T09:45:00Z");
+    const currentTime = new Date("2024-01-01T10:00:00Z");
+    
+    const result4 = determineNotificationTiming(
+      mediumPriorityApplications,
+      normalWorkload,
+      recentNotification,
+      "medium"
+    );
+    
+    // 30分以内は緊急案件以外通知抑制
     expect(result4.shouldSendNotification).toBe(false);
-    expect(result4.notificationFrequency).toBe("180minutes");
+    expect(result4.notificationFrequency).toBe("60minutes");
+    expect(result4.nextNotificationTime).toEqual(new Date("2024-01-01T10:00:00Z"));
   });
 });

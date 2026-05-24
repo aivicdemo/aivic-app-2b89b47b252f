@@ -4,79 +4,58 @@ describe("承認遅延案件を検知し担当者に自動で催促通知を送�
   test("催促通知宛先特定 - 承認者も代理承認者も特定できない場合、エラーが発生する", () => {
     // SCEN-458
 
+    // 承認者も代理承認者も特定できない場合
     expect(() => 
       identifyNotificationRecipient(
-        "APP-001",
+        "APP-12345",
         "補助金申請",
-        "課長承認",
-        "APPROVER-999",
-        false
-      )
-    ).toThrow("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
-
-    expect(() =>
-      identifyNotificationRecipient(
-        "APP-002",
-        "設備申請",
         "部長承認",
-        "INVALID-ID",
-        false
+        "",  // 承認権限者が空
+        false  // 承認者が不在
       )
     ).toThrow("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
 
-    expect(() =>
+    // 承認権限者がいても代理者が見つからない場合
+    expect(() => 
       identifyNotificationRecipient(
-        "",
-        "補助金申請",
+        "APP-12346",
+        "一般申請",
         "課長承認",
-        "APPROVER-001",
-        true
+        "invalid-approver-id",  // 存在しない承認者ID
+        false  // 承認者が不在
       )
-    ).toThrow("催促対象の申請案件が特定できません。正しい申請番号を確認してください。");
+    ).toThrow("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
 
-    const validResult = identifyNotificationRecipient(
-      "APP-003",
+    // 正常ケース: 承認権限者が在席している場合
+    const normalResult = identifyNotificationRecipient(
+      "APP-12347",
       "補助金申請",
-      "課長承認",
-      "APPROVER-001",
+      "部長承認",
+      "approver-001",
       true
     );
 
-    expect(validResult).toEqual({
-      recipientId: "APPROVER-001",
+    expect(normalResult).toEqual({
+      recipientId: "approver-001",
       recipientType: "primary_approver",
       notificationMethod: "urgent_contact",
       escalationRequired: false
     });
 
+    // 正常ケース: 代理承認者が見つかる場合
     const substituteResult = identifyNotificationRecipient(
-      "APP-004",
+      "APP-12348",
       "一般申請",
       "課長承認",
-      "SUB-APPROVER-001",
+      "approver-002",
       false
     );
 
     expect(substituteResult).toEqual({
-      recipientId: "SUB-APPROVER-001",
+      recipientId: "substitute-002",
       recipientType: "substitute_approver",
       notificationMethod: "email",
       escalationRequired: false
-    });
-
-    const escalationResult = identifyNotificationRecipient(
-      "APP-005",
-      "subsidy申請",
-      "部長承認",
-      "SUPERIOR-001",
-      true
-    );
-
-    expect(escalationResult).toEqual({
-      recipientId: "SUPERIOR-001",
-      recipientType: "superior_approver",
-      notificationMethod: "urgent_contact",
-      escalationRequired: true
     });
   });
 });

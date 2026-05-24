@@ -4,43 +4,49 @@ describe("文書種別に応じた承認フロー自動振り分け機能", () =
   test("差戻し時に適切な差戻し先が特定される", () => {
     // SCEN-481
     
-    // 補助金関連書類を課長が差戻しする場合
+    // 補助金関連書類で差戻し判断が下された場合
     const result1 = determineNextApprover(
-      "科研費申請に関する設備導入計画書",
-      "本申請は令和6年度科研費基盤研究による設備整備費補助金を活用した研究機器導入計画について記載したものです。",
+      "科研費申請書",
+      "本申請は文部科学省科学研究費助成事業における基盤研究(C)の申請であり、研究期間3年間で総額300万円の予算を要求するものです。",
+      "部長",
+      "差戻し"
+    );
+    
+    expect(result1).toEqual({
+      nextApprover: null,
+      processingRoute: "hybrid",
+      isSubsidyRelated: true,
+      requiresPaperStorage: true
+    });
+
+    // 一般書類で差戻し判断が下された場合
+    const result2 = determineNextApprover(
+      "設備購入申請書",
+      "研究室のパソコン更新のため、デスクトップPC5台の購入を申請します。",
       "課長",
       "差戻し"
     );
     
-    expect(result1.nextApprover).toBe(null);
-    expect(result1.processingRoute).toBe("hybrid");
-    expect(result1.isSubsidyRelated).toBe(true);
-    expect(result1.requiresPaperStorage).toBe(true);
-    
-    // 一般書類を部長が差戻しする場合
-    const result2 = determineNextApprover(
-      "会議室予約申請書",
-      "学内会議開催のための会議室使用申請を行います。",
-      "部長", 
-      "差戻し"
-    );
-    
-    expect(result2.nextApprover).toBe(null);
-    expect(result2.processingRoute).toBe("electronic");
-    expect(result2.isSubsidyRelated).toBe(false);
-    expect(result2.requiresPaperStorage).toBe(false);
-    
-    // 運営費交付金関連書類を理事が差戻しする場合
+    expect(result2).toEqual({
+      nextApprover: null,
+      processingRoute: "electronic",
+      isSubsidyRelated: false,
+      requiresPaperStorage: false
+    });
+
+    // 承認判断の場合は次の承認者が設定される
     const result3 = determineNextApprover(
-      "令和6年度運営費交付金による教育研究設備整備計画",
-      "文部科学省運営費交付金を財源とする教育研究基盤設備の整備に関する実施計画書です。",
-      "理事",
-      "差戻し"
+      "運営費交付金申請書",
+      "大学の運営費交付金による設備整備費の申請を行います。文部科学省の定める要件に従い適切に処理してください。",
+      "課長",
+      "承認"
     );
     
-    expect(result3.nextApprover).toBe(null);
-    expect(result3.processingRoute).toBe("hybrid");
-    expect(result3.isSubsidyRelated).toBe(true);
-    expect(result3.requiresPaperStorage).toBe(true);
+    expect(result3).toEqual({
+      nextApprover: "部長",
+      processingRoute: "hybrid", 
+      isSubsidyRelated: true,
+      requiresPaperStorage: true
+    });
   });
 });

@@ -1,67 +1,55 @@
-import { determinePriorityForReminder } from "../../src/logic/it-1-br-1-2-1";
+import { determinePriorityForReminder } from '../../src/logic/it-1-br-1-2-1';
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("同一優先度の案件について適切な順序が決定される", () => {
+  test("同一優先度スコアの案件が複数ある場合、処理順序で適切に並び替えられる", () => {
     // SCEN-448
     const pendingApplications = [
       {
-        applicationId: "APP001",
-        delayDays: 3,
-        approverLevel: 2,
-        documentImportance: 5,
+        applicationId: "APP-001",
+        delayDays: 5,
+        approverLevel: 3,
+        documentImportance: 7,
         applicantDepartment: "総務課"
       },
       {
-        applicationId: "APP002", 
-        delayDays: 3,
+        applicationId: "APP-002", 
+        delayDays: 7,
         approverLevel: 2,
         documentImportance: 6,
-        applicantDepartment: "経理課"
+        applicantDepartment: "財務課"
       },
       {
-        applicationId: "APP003",
-        delayDays: 4,
-        approverLevel: 1,
-        documentImportance: 4,
-        applicantDepartment: "人事課"
-      },
-      {
-        applicationId: "APP004",
-        delayDays: 2,
+        applicationId: "APP-003",
+        delayDays: 6,
         approverLevel: 3,
-        documentImportance: 7,
+        documentImportance: 6,
         applicantDepartment: "学務課"
       }
     ];
 
     const priorityWeights = {
-      delayWeight: 10,
-      levelWeight: 5,
-      importanceWeight: 3
+      delayWeight: 5,
+      levelWeight: 10,
+      importanceWeight: 8
     };
 
     const result = determinePriorityForReminder(pendingApplications, priorityWeights);
 
     expect(result).toEqual([
       {
-        applicationId: "APP003",
-        priorityScore: 45,
-        reminderUrgency: "medium"
+        applicationId: "APP-001",
+        priorityScore: 111,
+        reminderUrgency: "high"
       },
       {
-        applicationId: "APP002",
-        priorityScore: 43,
-        reminderUrgency: "medium"
+        applicationId: "APP-002",
+        priorityScore: 103,
+        reminderUrgency: "high"
       },
       {
-        applicationId: "APP001",
-        priorityScore: 40,
-        reminderUrgency: "low"
-      },
-      {
-        applicationId: "APP004",
-        priorityScore: 36,
-        reminderUrgency: "low"
+        applicationId: "APP-003",
+        priorityScore: 98,
+        reminderUrgency: "high"
       }
     ]);
   });

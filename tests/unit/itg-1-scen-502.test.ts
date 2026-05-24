@@ -4,58 +4,49 @@ describe("処理ルート変更時に関係者へ自動通知し承認フロー�
   test("変更要件承認処理 - 承認却下時に適切な理由と共に差戻しが実行される", () => {
     // SCEN-502
 
-    // 権限外の重大な変更要求（理事会承認が必要）
-    const largeScopeChangeRequirements = "全学的なシステム改修を伴う文書分類基準の大幅変更。従来の電子化基準を全面的に見直し、新たに10の文書種別で紙保管を義務付ける。";
-    const extensiveImpactAnalysis = "全12学部、8事務部門に影響が及び、年間2万件の申請書類処理フローの変更が必要。システム改修費用3000万円、移行期間6ヶ月を要すると想定される。";
-    const standardDirectorAuthority = "standard";
-    const mediumComplianceRisk = 5;
-
-    const result = approveRequirementChange(
-      largeScopeChangeRequirements,
-      extensiveImpactAnalysis,
-      standardDirectorAuthority,
-      mediumComplianceRisk
+    // 承認却下（理事会承認が必要なケース）
+    const result1 = approveRequirementChange(
+      "補助金申請書類の電子化処理ルートから紙保管必須ルートへの変更要求。影響範囲は全学的で、設備申請、研究費申請、人事申請等の主要業務に波及する。システム改修工数は2ヶ月以上を要し、関連部署は10以上。",
+      "影響範囲: 全学的（事務局、総務部、財務部、学務部、研究推進部、図書館、情報システム課など10以上の部署）\n対象文書: 補助金申請書、実績報告書、収支決算書、設備購入申請書\nシステム変更: データベーススキーマ変更、API仕様変更、UI大幅改修\n予想工数: 約320時間（2ヶ月）",
+      "standard",
+      3
     );
 
-    expect(result.approved).toBe(false);
-    expect(result.approvalComment).toBe("理事会承認が必要");
-    expect(result.nextAction).toBe("理事会への上申準備");
-    expect(result.urgencyLevel).toBe("保留");
+    expect(result1).toEqual({
+      approved: false,
+      approvalComment: "理事会承認が必要",
+      nextAction: "理事会への上申準備",
+      urgencyLevel: "保留"
+    });
 
-    // 法令違反リスクが高い場合の緊急承認
-    const highRiskChangeRequirements = "文部科学省の新規制に対応するため、補助金関連書類の紙保管要件を緊急追加。";
-    const criticalImpactAnalysis = "法令違反回避のため即座の対応が必要。";
-    const standardAuthority = "standard";
-    const highComplianceRisk = 9;
-
-    const emergencyResult = approveRequirementChange(
-      highRiskChangeRequirements,
-      criticalImpactAnalysis,
-      standardAuthority,
-      highComplianceRisk
+    // 承認可能（法令違反リスク回避による緊急承認）
+    const result2 = approveRequirementChange(
+      "文部科学省からの緊急通達により、補助金関連書類の紙保管要件が新たに追加。期限は2週間以内で、対応遅延は法令違反となる可能性が高い。",
+      "文部科学省通達対応: 緊急性有り\n対象書類: 科研費申請書、設備整備費申請書\n影響部署: 研究推進部、財務部\n変更内容: 電子保管から電子+紙ハイブリッド保管への変更",
+      "standard",
+      9
     );
 
-    expect(emergencyResult.approved).toBe(true);
-    expect(emergencyResult.approvalComment).toBe("法令違反リスク回避のため緊急承認");
-    expect(emergencyResult.nextAction).toBe("即座に文書分類基準を更新");
-    expect(emergencyResult.urgencyLevel).toBe("緊急");
+    expect(result2).toEqual({
+      approved: true,
+      approvalComment: "法令違反リスク回避のため緊急承認",
+      nextAction: "即座に文書分類基準を更新",
+      urgencyLevel: "緊急"
+    });
 
-    // 通常承認条件を満たすケース
-    const normalChangeRequirements = "文部科学省の補助金要件変更に伴い、科研費申請書の電子保管基準を修正。";
-    const limitedImpactAnalysis = "研究関連部署3部門に影響。月間500件程度の申請書類が対象。";
-    const validAuthority = "standard";
-    const lowRisk = 3;
-
-    const normalResult = approveRequirementChange(
-      normalChangeRequirements,
-      limitedImpactAnalysis,
-      validAuthority,
-      lowRisk
+    // 通常承認（文部科学省関連で権限内）
+    const result3 = approveRequirementChange(
+      "補助金申請書類の処理ルート効率化。文部科学省要件に準拠した電子化推進により、処理時間短縮とコスト削減を実現。",
+      "対象: 文部科学省関連補助金\n効果: 処理時間30%短縮、コスト20%削減\n影響範囲: 限定的（研究推進部、財務部のみ）\n実装工数: 約40時間",
+      "standard",
+      4
     );
 
-    expect(normalResult.approved).toBe(true);
-    expect(normalResult.approvalComment).toBe("通常承認");
-    expect(normalResult.nextAction).toBe("文書分類基準の更新を実施");
-    expect(normalResult.urgencyLevel).toBe("通常");
+    expect(result3).toEqual({
+      approved: true,
+      approvalComment: "通常承認",
+      nextAction: "文書分類基準の更新を実施",
+      urgencyLevel: "通常"
+    });
   });
 });

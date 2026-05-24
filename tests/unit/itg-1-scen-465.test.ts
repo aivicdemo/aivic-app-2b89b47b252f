@@ -1,99 +1,93 @@
-import { determinePriorityForApprovalNotification } from '../../src/logic/it-1-br-1-2-1';
+import { identifyNotificationRecipient } from '../../src/logic/it-1-br-1-2-1';
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("高緊急度案件が即座に通知される", () => {
+  test("高緊急度の申請案件で承認者が在席中の場合は本人に緊急連絡で通知される", () => {
     // SCEN-465
-    
-    // 期限まで3日以内の緊急案件
-    const result1 = determinePriorityForApprovalNotification(
-      "緊急設備申請書",
-      "設備申請",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-03T17:00:00Z"), // 3日以内
-      false
-    );
-    
-    expect(result1.priority).toBe('high');
-    expect(result1.notificationTiming).toBe('immediate');
-    expect(result1.urgencyReason).toBe('期限まで3日以内');
-    
-    // 補助金関連申請（期限に関係なく高優先度）
-    const result2 = determinePriorityForApprovalNotification(
-      "科研費申請書",
-      "補助金申請",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-15T17:00:00Z"), // 期限まで2週間
+    const result = identifyNotificationRecipient(
+      "APP-2023-001",
+      "subsidy",
+      "department_head",
+      "USR-001",
       true
     );
-    
-    expect(result2.priority).toBe('high');
-    expect(result2.notificationTiming).toBe('immediate');
-    expect(result2.urgencyReason).toBe('補助金関連申請');
-    
-    // タイトルに緊急キーワード含有
-    const result3 = determinePriorityForApprovalNotification(
-      "至急対応が必要な物品購入申請",
-      "物品申請",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-20T17:00:00Z"), // 期限まで3週間
+
+    expect(result).toEqual({
+      recipientId: "USR-001",
+      recipientType: "primary_approver",
+      notificationMethod: "urgent_contact",
+      escalationRequired: false
+    });
+  });
+
+  test("高緊急度の申請案件で承認者が不在の場合は代理承認者に緊急連絡で通知される", () => {
+    // SCEN-465
+    const result = identifyNotificationRecipient(
+      "APP-2023-002",
+      "subsidy",
+      "section_chief",
+      "USR-002",
       false
     );
-    
-    expect(result3.priority).toBe('high');
-    expect(result3.notificationTiming).toBe('immediate');
-    expect(result3.urgencyReason).toBe('タイトルに緊急キーワード含有');
-    
-    // 期限まで7日以内（通常優先度）
-    const result4 = determinePriorityForApprovalNotification(
-      "通常の備品申請",
-      "物品申請",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-06T17:00:00Z"), // 6日
-      false
+
+    expect(result.recipientType).toBe("substitute_approver");
+    expect(result.notificationMethod).toBe("urgent_contact");
+    expect(result.escalationRequired).toBe(false);
+  });
+
+  test("一般申請で承認者が在席中の場合は通常のメール通知が送信される", () => {
+    // SCEN-465
+    const result = identifyNotificationRecipient(
+      "APP-2023-003",
+      "general",
+      "section_chief", 
+      "USR-003",
+      true
     );
-    
-    expect(result4.priority).toBe('normal');
-    expect(result4.notificationTiming).toBe('scheduled');
-    expect(result4.urgencyReason).toBe('期限まで1週間以内');
-    
-    // 低優先度案件
-    const result5 = determinePriorityForApprovalNotification(
-      "日常業務報告書",
-      "報告書",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-30T17:00:00Z"), // 期限まで1か月
-      false
-    );
-    
-    expect(result5.priority).toBe('low');
-    expect(result5.notificationTiming).toBe('scheduled');
-    expect(result5.urgencyReason).toBe('通常の申請案件');
-    
-    // エラーケース：タイトルが空
-    expect(() => determinePriorityForApprovalNotification(
-      "",
-      "物品申請",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-06T17:00:00Z"),
-      false
-    )).toThrow("申請書類のタイトルが入力されていません。");
-    
-    // エラーケース：文書種別が未指定
-    expect(() => determinePriorityForApprovalNotification(
-      "テスト申請",
-      "",
-      new Date("2024-01-01T09:00:00Z"),
-      new Date("2024-01-06T17:00:00Z"),
-      false
-    )).toThrow("申請書類の種別を選択してください。");
-    
-    // エラーケース：提出日時が未来
-    expect(() => determinePriorityForApprovalNotification(
-      "テスト申請",
-      "物品申請",
-      new Date("2024-12-31T09:00:00Z"),
-      new Date("2024-01-06T17:00:00Z"),
-      false
-    )).toThrow("提出日時に未来の日付は指定できません。");
+
+    expect(result).toEqual({
+      recipientId: "USR-003",
+      recipientType: "primary_approver",
+      notificationMethod: "email",
+      escalationRequired: false
+    });
+  });
+
+  test("承認者も代理者も特定できない場合はエラーが発生する", () => {
+    // SCEN-465
+    expect(() => {
+      identifyNotificationRecipient(
+        "",
+        "general",
+        "section_chief",
+        "",
+        false
+      );
+    }).toThrow("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
+  });
+
+  test("申請案件の識別番号が無効な場合はエラーが発生する", () => {
+    // SCEN-465
+    expect(() => {
+      identifyNotificationRecipient(
+        "",
+        "subsidy",
+        "department_head",
+        "USR-001",
+        true
+      );
+    }).toThrow("催促対象の申請案件が特定できません。正しい申請番号を確認してください。");
+  });
+
+  test("承認段階の情報が取得できない場合はエラーが発生する", () => {
+    // SCEN-465
+    expect(() => {
+      identifyNotificationRecipient(
+        "APP-2023-001",
+        "subsidy",
+        "",
+        "USR-001",
+        true
+      );
+    }).toThrow("承認フローの現在段階を特定できません。申請状況を確認してください。");
   });
 });

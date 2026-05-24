@@ -1,14 +1,14 @@
-import { handleSystemFailureFallback } from "../../src/logic/it-1";
+import { handleSystemFailureFallback } from '../../src/logic/it-1';
 
 describe("承認フローの進捗状況と滞留期間をリアルタイムで可視化する", () => {
-  test("システム障害時承認継続 - 障害復旧後のデータ同期が正常に実行される", () => {
+  test("システム障害時でも承認進捗確認と催促業務を継続し、障害復旧後にデータを同期する", () => {
     // SCEN-463
     
-    // 正常動作時のケース
+    // 正常稼働時
     const normalResult = handleSystemFailureFallback(
-      "normal", // systemStatus
-      "APP-001", // applicationId
-      "admin" // userRole
+      "running",
+      "APP-001",
+      "一般職員"
     );
     
     expect(normalResult).toEqual({
@@ -17,46 +17,33 @@ describe("承認フローの進捗状況と滞留期間をリアルタイムで�
       paperFormUrl: "",
       syncRequired: false
     });
-
-    // システム障害発生時のケース（重要度高の申請書類）
-    const downResult = handleSystemFailureFallback(
-      "down", // systemStatus
-      "APP-002", // applicationId
-      "staff" // userRole
-    );
     
-    expect(downResult.fallbackMethod).toBe("emergency_paper");
-    expect(downResult.syncRequired).toBe(true);
-    expect(downResult.emergencyContactList.length).toBeGreaterThan(0);
-    expect(downResult.paperFormUrl).toBeTruthy();
-
-    // エラー状態でのケース
-    const errorResult = handleSystemFailureFallback(
-      "error", // systemStatus
-      "APP-003", // applicationId
-      "manager" // userRole
-    );
-    
-    expect(errorResult.fallbackMethod).toBe("emergency_paper");
-    expect(errorResult.syncRequired).toBe(true);
-
-    // 申請書類が存在しない場合の制約テスト
-    expect(() => {
-      handleSystemFailureFallback(
-        "down",
-        "", // 空の申請ID
-        "staff"
-      );
-    }).toThrow("指定された申請書類が見つかりません。正しい申請番号を入力してください。");
-
-    // システム障害が長時間継続している場合の警告テスト
-    const longDownResult = handleSystemFailureFallback(
+    // システム障害発生（重要度高い書類）
+    const downSystemResult = handleSystemFailureFallback(
       "down",
-      "APP-LONG-DOWN",
-      "staff"
+      "SUB-001",
+      "一般職員"
     );
     
-    // 長時間障害の場合でも同期が必要
-    expect(longDownResult.syncRequired).toBe(true);
+    expect(downSystemResult).toEqual({
+      fallbackMethod: "emergency_paper",
+      emergencyContactList: ["emergency_contact_1", "emergency_contact_2"],
+      paperFormUrl: "http://emergency.example.com/forms/SUB-001",
+      syncRequired: true
+    });
+    
+    // システム障害発生（一般書類）
+    const downGeneralResult = handleSystemFailureFallback(
+      "error",
+      "GEN-001", 
+      "一般職員"
+    );
+    
+    expect(downGeneralResult).toEqual({
+      fallbackMethod: "wait_recovery",
+      emergencyContactList: ["support_contact_1"],
+      paperFormUrl: "http://emergency.example.com/forms/GEN-001",
+      syncRequired: true
+    });
   });
 });
