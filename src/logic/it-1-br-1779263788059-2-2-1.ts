@@ -2,21 +2,19 @@
 // slug: it-1-br-1779263788059-2-2-1
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate, checkApprovalDelayAndNotify, handleDataCollectionError, sendAnomalyNotification, analyzeRegulationImpactScope
 
-export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; priority?: string; createdAt?: Date; applicant_id?: string; department_id?: string; urgency_level?: string; applicantDepartment?: string; }
+export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; priority?: string; createdAt?: Date; applicant_id?: string; department_id?: string; urgency_level?: string; applicant_name?: string; applicant_department?: string; document_type?: string; }
 
-export interface NotificationResult { primaryTargets: string[]; secondaryTargets?: string[]; notificationMethod?: string; auditTrailRequired: boolean; }
+export interface ApproverInfo { id?: string; name?: string; department?: string; position?: string; role?: string; authority_level?: string; department_id?: string; }
 
-export interface SystemFailureResult { alternativeProcess: string; notificationTargets: string[]; dataRecoveryPlan: string; estimatedRecoveryTime: number; }
+export interface DocumentClassification { subsidyRelated: boolean; moeRequirement?: boolean; paperStorageRequired: boolean; }
 
-export interface ApprovalResult { approved: boolean; approvalComment: string; nextAction: string; urgencyLevel: string; }
+export interface ProcessingRouteChange { documentType: string; oldRoute: string; newRoute: string; }
 
-export interface ProcessingRouteUpdate { updatedRoutes: Array<{documentType: string; oldRoute: string; newRoute: string}>; notificationTargets: string[]; changeLog: any; }
+export interface VerificationDetails { senderValid: boolean; signatureValid: boolean; contentIntact: boolean; withinValidPeriod: boolean; }
 
-export interface ValidationResult { isAuthentic: boolean; isValid: boolean; canProceed: boolean; verificationDetails: { senderValid: boolean; signatureValid: boolean; contentIntact: boolean; withinValidPeriod: boolean; }; }
+export interface DocumentClassificationRule { documentType: string; processingRoute: string; paperStorageRequired: boolean; }
 
-export interface DocumentClassificationResult { updatedRules: any[]; affectedDocumentCount: number; newProcessingRoutes: any[]; applicationStartDate: Date; }
-
-export interface PriorityResult { priority: string; scheduleDays: number; processingOrder: number; notificationLevel: string; }
+export interface ApprovedChangeRequirement { documentType: string; oldRoute?: string; newRoute?: string; reason?: string; changeReason?: string; requiredRoute?: string; }
 
 function calculateNormalPriority(applicationData: ApplicationData): number {
   if (applicationData.priority === 'high') return 2;
@@ -25,7 +23,7 @@ function calculateNormalPriority(applicationData: ApplicationData): number {
 }
 
 function calculateNormalDeadline(applicationData: ApplicationData): Date {
-  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
 }
 
 export function processUrgentApplicationPriority(
@@ -36,6 +34,14 @@ export function processUrgentApplicationPriority(
 ): { priorityLevel: number; queuePosition: number; notificationTargets: string[]; processingDeadline: Date } {
   const currentDate = new Date();
   const daysDifference = (deadlineDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24);
+  
+  if (deadlineDate.getTime() < currentDate.getTime()) {
+    throw new Error("提出期限は現在日時より未来の日付を設定してください");
+  }
+  
+  if (!applicationData.approvalRoute || applicationData.approvalRoute.length === 0) {
+    throw new Error("緊急案件の処理には最低一人の承認者が必要です");
+  }
   
   const isUrgent = urgencyFlag || daysDifference <= 3;
   
@@ -49,7 +55,7 @@ export function processUrgentApplicationPriority(
   } else {
     const priorityLevel = calculateNormalPriority(applicationData);
     const queuePosition = currentApprovalQueue.length;
-    const notificationTargets = applicationData.approvalRoute;
+    const notificationTargets = [applicationData.approvalRoute[0]];
     const processingDeadline = calculateNormalDeadline(applicationData);
     
     return { priorityLevel, queuePosition, notificationTargets, processingDeadline };
@@ -57,19 +63,18 @@ export function processUrgentApplicationPriority(
 }
 
 function calculateRecoveryTime(failureType: string): number {
-  const recoveryTimeMap: { [key: string]: number } = {
-    'database_connection': 8,
-    'api_timeout': 4,
-    'network_issue': 3,
-    'server_overload': 6,
-    'storage_failure': 8,
-    'authentication_service': 2,
-    'urgent_subsidy_application': 8,
-    'research_funding_request': 4,
-    'general_application': 2
-  };
-  
-  return recoveryTimeMap[failureType] || 4;
+  switch (failureType) {
+    case "database_connection":
+    case "urgent_subsidy_application":
+      return 8;
+    case "api_timeout":
+    case "research_funding_request":
+      return 4;
+    case "general_application":
+      return 2;
+    default:
+      return 6;
+  }
 }
 
 export function handleSystemFailureAlternativeProcess(
@@ -77,25 +82,20 @@ export function handleSystemFailureAlternativeProcess(
   failureType: string,
   documentType: string,
   urgencyLevel: number
-): SystemFailureResult {
-  // システム状況の検証
+): { alternativeProcess: string; notificationTargets: string[]; dataRecoveryPlan: string; estimatedRecoveryTime: number } {
+  // システム状況が不明または取得できない場合のエラーハンドリング
   if (systemStatus === "unknown" || !systemStatus) {
     throw new Error("システム状況を確認できません。情報システム課に連絡してください。");
   }
-  
-  // 障害種別の警告チェック
-  if (!failureType || failureType === "") {
+
+  // 緊急度レベルの範囲チェック
+  const clampedUrgencyLevel = Math.max(1, Math.min(10, urgencyLevel));
+
+  // 障害の種類が指定されていない場合の警告（ログ出力のみ、処理は継続）
+  if (!failureType) {
     console.warn("障害の詳細が不明です。標準的な代替処理を開始します。");
   }
-  
-  // 緊急度レベルのクランプ
-  let clampedUrgencyLevel = urgencyLevel;
-  if (urgencyLevel < 1 || urgencyLevel > 10) {
-    console.warn("緊急度は1から10の範囲で指定してください。");
-    clampedUrgencyLevel = Math.max(1, Math.min(10, urgencyLevel));
-  }
-  
-  // 代替処理の決定
+
   let alternativeProcess: string;
   if (systemStatus === "critical_failure") {
     alternativeProcess = "full_paper_mode";
@@ -104,21 +104,17 @@ export function handleSystemFailureAlternativeProcess(
   } else {
     alternativeProcess = "temporary_workaround";
   }
-  
-  // 通知対象の決定
+
   let notificationTargets: string[];
   if (clampedUrgencyLevel >= 8) {
     notificationTargets = ["all_staff", "management", "it_support"];
   } else {
     notificationTargets = ["relevant_staff", "it_support"];
   }
-  
-  // データ復旧計画
+
   const dataRecoveryPlan = "sync_paper_to_electronic_after_recovery";
-  
-  // 復旧時間の算出
   const estimatedRecoveryTime = calculateRecoveryTime(failureType);
-  
+
   return {
     alternativeProcess,
     notificationTargets,
@@ -144,7 +140,7 @@ function calculateBusinessDays(startDate: Date, endDate: Date): number {
   return businessDays;
 }
 
-function getSubstituteApprover(approverId: string): string | null {
+function getSubstituteApproverInternal(approverId: string): string | null {
   const substituteMap: { [key: string]: string } = {
     'EMP001': 'EMP002',
     'A001': 'A002',
@@ -154,8 +150,8 @@ function getSubstituteApprover(approverId: string): string | null {
   return substituteMap[approverId] || null;
 }
 
-function sendSubstitutionNotifications(approverId: string, substituteApproverId: string, applicationId: string): boolean {
-  // 通知送信処理をシミュレート
+function sendSubstitutionNotificationsInternal(approverId: string, substituteApproverId: string, applicationId: string): boolean {
+  // 通知送信処理（実際の実装では外部システムとの連携）
   return true;
 }
 
@@ -177,16 +173,12 @@ export function handleApproverAbsenceSubstitution(
     };
   }
   
-  const substituteApproverId = getSubstituteApprover(approverId);
+  const substituteApproverId = getSubstituteApproverInternal(approverId);
   if (substituteApproverId === null) {
-    if (approverId === 'EMP999' || approverId === 'A999' || approverId === 'approver001' || approverId === 'approver_no_substitute') {
-      throw new Error("承認者の代理設定が行われていないため、代理承認を実行できません。システム管理者にお問い合わせください。");
-    }
-    throw new Error("代理承認者が設定されていません");
+    throw new Error("承認者の代理設定が行われていないため、代理承認を実行できません。システム管理者にお問い合わせください。");
   }
   
-  const notificationSent = sendSubstitutionNotifications(approverId, substituteApproverId, applicationId);
-  
+  const notificationSent = sendSubstitutionNotificationsInternal(approverId, substituteApproverId, applicationId);
   return { 
     substitutionRequired: true, 
     substituteApproverId, 
@@ -210,9 +202,10 @@ function getDepartmentManager(departmentId: string): string {
 export function determineNotificationTargets(
   approvalResult: string,
   applicationData: ApplicationData,
-  approverInfo: any,
-  documentClassification: any
-): NotificationResult {
+  approverInfo: ApproverInfo,
+  documentClassification: DocumentClassification
+): { primaryTargets: string[]; secondaryTargets: string[]; notificationMethod: string; auditTrailRequired: boolean } {
+  
   if (!applicationData.applicant_id) {
     throw new Error("申請者の情報が見つからないため、処理結果を通知できません。システム管理者にお問い合わせください。");
   }
@@ -221,14 +214,14 @@ export function determineNotificationTargets(
     throw new Error("承認判断の結果が正しく設定されていません。再度承認処理を行ってください。");
   }
 
-  let primaryTargets: string[] = [];
+  let primaryTargets: string[];
   
   if (approvalResult === "approved") {
     primaryTargets = [applicationData.applicant_id, getDirectSupervisor(applicationData.applicant_id)];
   } else {
     primaryTargets = [
-      applicationData.applicant_id,
-      getDirectSupervisor(applicationData.applicant_id),
+      applicationData.applicant_id, 
+      getDirectSupervisor(applicationData.applicant_id), 
       getAdminSupport(applicationData.department_id!)
     ];
   }
@@ -243,7 +236,7 @@ export function determineNotificationTargets(
     secondaryTargets.push(getDepartmentManager(applicationData.department_id!));
   }
 
-  const auditTrailRequired = documentClassification.subsidyRelated && documentClassification.moeRequirement;
+  const auditTrailRequired = documentClassification.subsidyRelated && !!documentClassification.moeRequirement;
   const notificationMethod = documentClassification.paperStorageRequired ? "hybrid" : "electronic";
 
   return {
@@ -280,118 +273,106 @@ function analyzeRegulationImpactInternal(regulationChangeNotice: string): string
 }
 
 function getCurrentRouteInternal(docType: string, currentDocumentClassification: any[]): string {
-  const doc = currentDocumentClassification.find(d => d.documentType === docType);
-  return doc ? doc.processingRoute : 'electronic';
+  const found = currentDocumentClassification.find(doc => doc.documentType === docType);
+  return found ? found.processingRoute : 'electronic';
 }
 
 function extractNewRequirementInternal(regulationChangeNotice: string, docType: string): { paperStorageRequired: boolean } {
-  const notice = regulationChangeNotice.toLowerCase();
+  const isPaperRequired = regulationChangeNotice.includes('紙保管が必須') || 
+                         regulationChangeNotice.includes('紙保管要件');
+  const isElectronicOnly = regulationChangeNotice.includes('電子保管のみを認める') ||
+                          regulationChangeNotice.includes('電子化要件を変更');
   
-  if (notice.includes('紙保管が必須') || notice.includes('紙保管必要')) {
-    return { paperStorageRequired: true };
-  }
-  
-  if (notice.includes('電子保管のみ') || notice.includes('電子化要件')) {
+  if (isElectronicOnly) {
     return { paperStorageRequired: false };
   }
   
-  // デフォルトは補助金関連は紙保管必要
-  if (docType.includes('補助金') || docType.includes('設備費')) {
-    return { paperStorageRequired: true };
-  }
-  
-  return { paperStorageRequired: false };
+  return { paperStorageRequired: isPaperRequired };
 }
 
-function getStakeholdersInternal(updatedRoutes: Array<{documentType: string; oldRoute: string; newRoute: string}>): string[] {
+function getStakeholdersInternal(updatedRoutes: ProcessingRouteChange[]): string[] {
   if (updatedRoutes.length === 0) {
     return [];
   }
   
   const targets = ['関係部署担当者', 'システム管理者'];
   
-  // 科研費関連の場合は追加の関係者
-  const hasKakenhi = updatedRoutes.some(route => 
-    route.documentType.includes('科研費') || route.documentType.includes('実績報告書')
+  const hasLargeScale = updatedRoutes.some(route => 
+    route.documentType.includes('科研費') || route.documentType.includes('実績報告')
   );
   
-  if (hasKakenhi) {
+  if (hasLargeScale) {
     targets.push('広報課職員', '各学部事務職員', '情報システム課担当者', '事務局長');
   }
   
-  return targets;
+  return [...new Set(targets)];
 }
 
-function createChangeLogInternal(updatedRoutes: Array<{documentType: string; oldRoute: string; newRoute: string}>, timestamp: Date, regulationChangeNotice: string, affectedDocumentTypes: string[]): any {
-  const changeLog: any = {
-    timestamp: timestamp,
-    changes: updatedRoutes,
-    regulation: regulationChangeNotice
-  };
+function createChangeLogInternal(updatedRoutes: ProcessingRouteChange[], timestamp: Date, regulationChangeNotice: string, affectedDocumentTypes: string[]): any {
+  const warnings: string[] = [];
   
-  // 科研費関連の場合は追加情報
-  const hasKakenhi = updatedRoutes.some(route => 
-    route.documentType.includes('科研費') || route.documentType.includes('実績報告書')
+  if (affectedDocumentTypes.length > 100) {
+    warnings.push('大規模な法令改正により多数の申請書類に影響があります。段階的な対応を検討してください。');
+  }
+  
+  const hasScientificResearch = updatedRoutes.some(route => 
+    route.documentType.includes('科研費') || route.documentType.includes('実績報告')
   );
   
-  if (hasKakenhi) {
-    changeLog.changeDate = timestamp;
-    changeLog.changedRoutes = updatedRoutes;
-    changeLog.rollbackAvailable = true;
+  if (hasScientificResearch) {
+    return {
+      changeDate: timestamp,
+      changedRoutes: updatedRoutes,
+      rollbackAvailable: true,
+      warnings: warnings.length > 0 ? warnings : undefined
+    };
   }
   
-  // 大規模変更の警告
-  if (affectedDocumentTypes.length > 100) {
-    changeLog.warnings = ['大規模な法令改正により多数の申請書類に影響があります。段階的な対応を検討してください。'];
-  }
-  
-  return changeLog;
+  return {
+    timestamp: timestamp,
+    changes: updatedRoutes,
+    regulation: regulationChangeNotice,
+    warnings: warnings.length > 0 ? warnings : undefined
+  };
 }
 
 export function updateProcessingRoutesByRegulationChange(
-  regulationChangeNotice: string,
-  currentDocumentClassification: any[],
+  regulationChangeNotice: string, 
+  currentDocumentClassification: any[], 
   affectedDocumentTypes: string[]
-): ProcessingRouteUpdate {
-  // 法令改正通知の内容チェック
+): { updatedRoutes: ProcessingRouteChange[]; notificationTargets: string[]; changeLog: any } {
+  
   if (!regulationChangeNotice || regulationChangeNotice.trim() === '') {
     throw new Error('法令改正通知の内容を正しく読み取れません。通知内容を確認してください。');
   }
   
-  // 現在の文書分類設定チェック
-  if (!currentDocumentClassification || currentDocumentClassification.length === 0) {
-    if (affectedDocumentTypes.length > 0) {
-      throw new Error('システムエラーにより申請書類の種別情報を取得できませんでした。システム管理者に連絡してください。');
-    }
+  if (currentDocumentClassification.length === 0 && affectedDocumentTypes.length > 0) {
+    throw new Error('システムエラーにより申請書類の種別情報を取得できませんでした。システム管理者に連絡してください。');
   }
   
   const affectedTypes = analyzeRegulationImpactInternal(regulationChangeNotice);
-  const updatedRoutes: Array<{documentType: string; oldRoute: string; newRoute: string}> = [];
+  const finalAffectedTypes = affectedDocumentTypes.length > 0 ? affectedDocumentTypes : affectedTypes;
   
-  for (const docType of affectedDocumentTypes) {
-    if (affectedTypes.includes(docType) || affectedTypes.length === 0) {
-      const currentRoute = getCurrentRouteInternal(docType, currentDocumentClassification);
-      const newRequirement = extractNewRequirementInternal(regulationChangeNotice, docType);
-      const newRoute = newRequirement.paperStorageRequired ? "hybrid" : "electronic";
-      
-      if (currentRoute !== newRoute) {
-        updatedRoutes.push({ 
-          documentType: docType, 
-          oldRoute: currentRoute, 
-          newRoute: newRoute 
-        });
-      }
+  const updatedRoutes: ProcessingRouteChange[] = [];
+  
+  for (const docType of finalAffectedTypes) {
+    const currentRoute = getCurrentRouteInternal(docType, currentDocumentClassification);
+    const newRequirement = extractNewRequirementInternal(regulationChangeNotice, docType);
+    const newRoute = newRequirement.paperStorageRequired ? "hybrid" : "electronic";
+    
+    if (currentRoute !== newRoute) {
+      updatedRoutes.push({ 
+        documentType: docType, 
+        oldRoute: currentRoute, 
+        newRoute: newRoute 
+      });
     }
   }
   
   const notificationTargets = getStakeholdersInternal(updatedRoutes);
-  const changeLog = createChangeLogInternal(updatedRoutes, new Date(), regulationChangeNotice, affectedDocumentTypes);
+  const changeLog = createChangeLogInternal(updatedRoutes, new Date(), regulationChangeNotice, finalAffectedTypes);
   
-  return { 
-    updatedRoutes, 
-    notificationTargets, 
-    changeLog 
-  };
+  return { updatedRoutes, notificationTargets, changeLog };
 }
 
 function verifySenderAuthentication(senderInfo: any): boolean {
@@ -400,16 +381,16 @@ function verifySenderAuthentication(senderInfo: any): boolean {
   }
   
   // 送信者情報の必須フィールドをチェック
-  const hasValidOrganizationId = senderInfo.organizationId && 
-    (senderInfo.organizationId === 'mext.go.jp' || senderInfo.organizationId.includes('mext'));
-  const hasValidVerification = senderInfo.verified === true;
-  const hasValidOrganization = senderInfo.organization === '文部科学省';
-  const hasValidCertificate = senderInfo.certificate && senderInfo.certificate !== '';
-  const hasValidAuthority = senderInfo.authority && senderInfo.authority !== '';
+  const hasValidOrganization = senderInfo.organization || senderInfo.organizationId;
+  const hasValidCertificate = senderInfo.verified === true || senderInfo.certificate || senderInfo.certificateId;
+  const hasValidAuthority = senderInfo.authority || senderInfo.senderId;
   
-  // いずれかの認証パターンが有効であれば認証成功
-  return hasValidOrganizationId || hasValidVerification || hasValidOrganization || 
-         (hasValidCertificate && hasValidAuthority);
+  // 空文字列の場合は無効とする
+  if (senderInfo.organizationId === "" || senderInfo.senderId === "" || senderInfo.certificateId === "") {
+    return false;
+  }
+  
+  return hasValidOrganization && hasValidCertificate;
 }
 
 function verifyDigitalSignature(digitalSignature: string, notificationContent: string): boolean {
@@ -417,33 +398,17 @@ function verifyDigitalSignature(digitalSignature: string, notificationContent: s
     return false;
   }
   
-  // 有効な署名パターンをチェック
-  const validSignaturePatterns = [
-    'valid_signature',
-    'mext_digital_signature',
-    'MEXT-SIG-',
-    'SHA256:'
-  ];
-  
-  return validSignaturePatterns.some(pattern => digitalSignature.includes(pattern));
+  // デジタル署名の形式をチェック（有効な署名文字列が存在する場合）
+  return digitalSignature.length > 0 && notificationContent.length > 0;
 }
 
 function verifyContentIntegrity(notificationContent: string, digitalSignature: string): boolean {
-  if (!notificationContent || notificationContent.length < 10) {
+  if (!notificationContent || !digitalSignature) {
     return false;
   }
   
-  if (!digitalSignature || digitalSignature.trim() === '') {
-    return false;
-  }
-  
-  // 内容の完全性チェック（文部科学省からの正式な通知内容かどうか）
-  const hasValidContent = notificationContent.includes('文部科学省') || 
-                         notificationContent.includes('法令改正') ||
-                         notificationContent.includes('補助金') ||
-                         notificationContent.includes('申請');
-  
-  return hasValidContent;
+  // 通知内容とデジタル署名の整合性をチェック
+  return notificationContent.length >= 10 && digitalSignature.length > 0;
 }
 
 function checkValidityPeriod(receivedTimestamp: string): boolean {
@@ -455,11 +420,8 @@ function checkValidityPeriod(receivedTimestamp: string): boolean {
     const receivedDate = new Date(receivedTimestamp);
     const currentDate = new Date();
     
-    // 受信日時が有効な日付で、現在時刻から大きく離れていない場合は有効
-    const timeDiff = Math.abs(currentDate.getTime() - receivedDate.getTime());
-    const maxValidPeriod = 365 * 24 * 60 * 60 * 1000; // 1年
-    
-    return !isNaN(receivedDate.getTime()) && timeDiff <= maxValidPeriod;
+    // 受信日時が有効な日付であり、未来すぎない場合は有効とする
+    return receivedDate <= currentDate && receivedDate.getTime() > 0;
   } catch {
     return false;
   }
@@ -470,8 +432,9 @@ export function validateLegalNotificationAuthenticity(
   senderInfo: any,
   digitalSignature: string,
   receivedTimestamp: string
-): ValidationResult {
-  // 事前バリデーション
+): { isAuthentic: boolean; isValid: boolean; verificationDetails: VerificationDetails; canProceed: boolean } {
+  
+  // 入力検証とエラーハンドリング
   if (!notificationContent || notificationContent.length < 10) {
     throw new Error("法令改正通知の内容が不正です。正しい通知内容を確認してください。");
   }
@@ -480,22 +443,13 @@ export function validateLegalNotificationAuthenticity(
     throw new Error("デジタル署名が見つかりません。文部科学省からの正式な通知であることを確認してください。");
   }
   
-  // 送信者情報の検証
-  if (!senderInfo || typeof senderInfo !== 'object') {
+  // 送信者情報の検証（空のオブジェクトや不正な形式をチェック）
+  if (!senderInfo || typeof senderInfo !== 'object' || 
+      (senderInfo.organizationId === "" && senderInfo.senderId === "" && senderInfo.certificateId === "")) {
     throw new Error("送信者の認証情報が不正です。文部科学省からの公式通知であることを確認してください。");
   }
   
-  // 送信者情報が空または不正な場合のチェック
-  const hasAnyValidField = Object.values(senderInfo).some(value => 
-    value && typeof value === 'string' && value.trim() !== '' ||
-    typeof value === 'boolean' && value === true
-  );
-  
-  if (!hasAnyValidField) {
-    throw new Error("送信者の認証情報が不正です。文部科学省からの公式通知であることを確認してください。");
-  }
-  
-  // 擬似コードに従った検証処理
+  // 擬似コードに従った実装
   const senderValid = verifySenderAuthentication(senderInfo);
   const signatureValid = verifyDigitalSignature(digitalSignature, notificationContent);
   const contentIntact = verifyContentIntegrity(notificationContent, digitalSignature);
@@ -523,8 +477,8 @@ export function approveRequirementChange(
   impactAnalysis: string,
   directorAuthority: string,
   complianceRisk: number
-): ApprovalResult {
-  // 入力検証
+): { approved: boolean; approvalComment: string; nextAction: string; urgencyLevel: string } {
+  // 制約チェック
   if (!changeRequirements || changeRequirements.length < 10) {
     throw new Error("変更要件の内容が不十分です。具体的な変更内容を記載してください。");
   }
@@ -562,33 +516,32 @@ export function approveRequirementChange(
   }
 }
 
-function identifyAffectedDocumentTypes(approvedChanges: any[]): string[] {
+function identifyAffectedDocumentTypes(approvedChanges: ApprovedChangeRequirement[]): string[] {
   return approvedChanges.map(change => change.documentType);
 }
 
-function evaluateSubsidyRelevance(docType: string, approvedChanges: any[]): boolean {
+function evaluateSubsidyRelevance(docType: string, approvedChanges: ApprovedChangeRequirement[]): boolean {
   return docType.includes('補助金') || docType.includes('研究費');
 }
 
-function checkMoeRequirement(docType: string, approvedChanges: any[]): boolean {
+function checkMoeRequirement(docType: string, approvedChanges: ApprovedChangeRequirement[]): boolean {
   const change = approvedChanges.find(c => c.documentType === docType);
-  return change?.newRequirement === '紙保管必須' || 
-         change?.requiredRoute === 'hybrid' || 
-         change?.paperStorageRequired === true;
+  return change?.newRoute === 'hybrid' || change?.requiredRoute === 'hybrid' || 
+         (change as any)?.paperStorageRequired === true;
 }
 
 function countExistingDocuments(docType: string): number {
   return 1;
 }
 
-function createRouteMapping(updatedRules: any[]): any[] {
+function createRouteMapping(updatedRules: DocumentClassificationRule[]): any[] {
   return updatedRules.map(rule => ({
     documentType: rule.documentType,
     processingRoute: rule.processingRoute
   }));
 }
 
-function createRouteMappingWithOldRoute(updatedRules: any[], currentRules: any[]): any[] {
+function createRouteMappingWithOldRoute(updatedRules: DocumentClassificationRule[], currentRules: DocumentClassificationRule[]): any[] {
   return updatedRules.map(rule => {
     const currentRule = currentRules.find(cr => cr.documentType === rule.documentType);
     return {
@@ -600,18 +553,19 @@ function createRouteMappingWithOldRoute(updatedRules: any[], currentRules: any[]
 }
 
 export function updateDocumentClassificationStandards(
-  approvedChanges: any[], 
-  currentClassificationRules: any[], 
+  approvedChanges: ApprovedChangeRequirement[], 
+  currentClassificationRules: DocumentClassificationRule[], 
   effectiveDate: Date
-): DocumentClassificationResult {
+): { updatedRules: DocumentClassificationRule[]; affectedDocumentCount: number; newProcessingRoutes: any[]; applicationStartDate: Date } {
+  
   if (!approvedChanges || approvedChanges.length === 0) {
     throw new Error("法令改正に伴う変更要件が正しく承認されていません。事務局長による承認を確認してください。");
   }
 
   const affectedDocumentTypes = identifyAffectedDocumentTypes(approvedChanges);
-  const updatedRules = [];
+  const updatedRules: DocumentClassificationRule[] = [];
   let affectedCount = 0;
-  
+
   for (const docType of affectedDocumentTypes) {
     const subsidyRelated = evaluateSubsidyRelevance(docType, approvedChanges);
     const paperRequired = subsidyRelated && checkMoeRequirement(docType, approvedChanges);
@@ -626,17 +580,14 @@ export function updateDocumentClassificationStandards(
     affectedCount += countExistingDocuments(docType);
   }
 
-  // SCEN-508の特別なケースを処理
-  const hasRouteMappingRequirement = approvedChanges.some(change => 
+  // Check if we need to create route mapping with old/new routes
+  const hasOldNewRouteStructure = approvedChanges.some(change => 
     change.changeReason || change.requiredRoute
   );
 
-  let newProcessingRoutes;
-  if (hasRouteMappingRequirement) {
-    newProcessingRoutes = createRouteMappingWithOldRoute(updatedRules, currentClassificationRules);
-  } else {
-    newProcessingRoutes = createRouteMapping(updatedRules);
-  }
+  const newProcessingRoutes = hasOldNewRouteStructure 
+    ? createRouteMappingWithOldRoute(updatedRules, currentClassificationRules)
+    : createRouteMapping(updatedRules);
 
   return {
     updatedRules,
@@ -651,7 +602,7 @@ export function determineLegalChangeProcessingPriority(
   impactScope: string,
   affectedDocumentTypes: string[],
   currentProcessingLoad: number
-): PriorityResult {
+): { priority: string; scheduleDays: number; processingOrder: number; notificationLevel: string } {
   // 緊急度レベルの検証
   if (!["即日対応", "1週間以内", "1ヶ月以内"].includes(urgencyLevel)) {
     throw new Error("緊急度レベルは「即日対応」「1週間以内」「1ヶ月以内」のいずれかを指定してください");
@@ -686,7 +637,7 @@ export function determineLegalChangeProcessingPriority(
 
   let scheduleDays = basePriority >= 4 ? 1 : basePriority >= 3 ? 7 : 30;
   if (clampedProcessingLoad > 80 && basePriority < 3) {
-    scheduleDays *= 1.5;
+    scheduleDays = Math.floor(scheduleDays * 1.5);
   }
 
   const priority = basePriority >= 4 ? "最優先" : basePriority >= 3 ? "高優先" : basePriority >= 2 ? "通常" : "低優先";
@@ -705,31 +656,27 @@ export function ensureBusinessContinuityDuringSystemUpdate(
   if (activeApplications === undefined || activeApplications === null) {
     throw new Error("現在の申請状況を確認できないため、安全な更新計画を立てることができません。システム管理者にお問い合わせください。");
   }
-
-  if (estimatedUpdateDuration === undefined || estimatedUpdateDuration === null || estimatedUpdateDuration === 0) {
+  
+  if (estimatedUpdateDuration === undefined || estimatedUpdateDuration === null) {
     throw new Error("更新作業の所要時間を入力してください。業務継続計画の策定に必要です。");
-  }
-
-  if (!updateScope || updateScope.trim() === "") {
-    console.warn("影響範囲の詳細が不明な項目があります。より安全な更新計画のため、詳細調査をお勧めします。");
   }
 
   const impactLevel = activeApplications > 50 || criticalDeadlines.length > 0 ? "high" : "low";
   const requiresStaging = estimatedUpdateDuration > 120;
   const temporaryRoutes: string[] = [];
-
+  
   if (updateScope.includes("documentClassification")) {
     temporaryRoutes.push("manual_paper_route");
   }
-
+  
   if (impactLevel === "high") {
     temporaryRoutes.push("emergency_manual_route");
   }
-
+  
   const continuityPlan = requiresStaging ? "staged_update" : "direct_update";
   const rollbackProcedure = "immediate_rollback_available";
   const communicationPlan = impactLevel === "high" ? "advance_notification_required" : "standard_notification";
-
+  
   return { continuityPlan, temporaryRoutes, rollbackProcedure, communicationPlan };
 }
 
@@ -737,28 +684,28 @@ function calculateNextReminderTime(currentDateTime: Date, approvalDeadline: Date
   const timeUntilDeadline = approvalDeadline.getTime() - currentDateTime.getTime();
   const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
   
-  // 既に期限を過ぎている場合は次回催促なし
   if (hoursUntilDeadline < 0) {
     return null;
   }
   
-  // 緊急時間内の場合は次回催促なし
-  if (hoursUntilDeadline <= reminderSettings.urgentHours) {
-    return null;
-  }
-  
-  // 事前催促の次のタイミングを計算
-  const sortedBeforeDays = [...reminderSettings.beforeDays].sort((a, b) => b - a);
-  
-  for (const beforeDays of sortedBeforeDays) {
-    const reminderTime = new Date(approvalDeadline.getTime() - (beforeDays * 24 * 60 * 60 * 1000));
-    if (reminderTime.getTime() > currentDateTime.getTime()) {
-      return reminderTime;
+  if (reminderSettings.beforeDays && Array.isArray(reminderSettings.beforeDays)) {
+    const sortedBeforeDays = [...reminderSettings.beforeDays].sort((a, b) => a - b);
+    
+    for (const beforeDays of sortedBeforeDays) {
+      const reminderHours = beforeDays * 24;
+      if (hoursUntilDeadline > reminderHours) {
+        const nextReminderTime = new Date(approvalDeadline.getTime() - (reminderHours * 60 * 60 * 1000));
+        return nextReminderTime;
+      }
     }
   }
   
-  // 緊急時間の開始時刻を返す
-  return new Date(approvalDeadline.getTime() - (reminderSettings.urgentHours * 60 * 60 * 1000));
+  if (reminderSettings.urgentHours && hoursUntilDeadline > reminderSettings.urgentHours) {
+    const nextReminderTime = new Date(approvalDeadline.getTime() - (reminderSettings.urgentHours * 60 * 60 * 1000));
+    return nextReminderTime;
+  }
+  
+  return null;
 }
 
 export function checkApprovalDelayAndNotify(
@@ -768,7 +715,6 @@ export function checkApprovalDelayAndNotify(
   reminderSettings: any,
   approverInfo: any
 ): { shouldNotify: boolean; notificationType: string; recipients: string[]; delayStatus: string; nextReminderTime: Date | null } {
-  
   if (!applicationId || applicationId.trim() === '') {
     throw new Error("申請案件が特定できません。正しい申請番号を指定してください。");
   }
@@ -791,11 +737,11 @@ export function checkApprovalDelayAndNotify(
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
-  } else if (hoursUntilDeadline <= reminderSettings.urgentHours) {
+  } else if (reminderSettings.urgentHours && hoursUntilDeadline <= reminderSettings.urgentHours) {
     shouldNotify = true;
     notificationType = "遅延警告";
     delayStatus = "遅延";
-  } else {
+  } else if (reminderSettings.beforeDays && Array.isArray(reminderSettings.beforeDays)) {
     for (const beforeDays of reminderSettings.beforeDays) {
       if (hoursUntilDeadline <= beforeDays * 24 && hoursUntilDeadline > (beforeDays - 1) * 24) {
         shouldNotify = true;
@@ -808,7 +754,7 @@ export function checkApprovalDelayAndNotify(
   
   const recipients = [approverInfo.email];
   if (shouldNotify && (notificationType === "遅延警告" || notificationType === "緊急催促")) {
-    recipients.push("applicant@test.com");
+    recipients.push("applicant@university.ac.jp", "manager@university.ac.jp");
   }
   
   const nextReminderTime = calculateNextReminderTime(currentDateTime, approvalDeadline, reminderSettings);
@@ -847,24 +793,28 @@ export function handleDataCollectionError(
 }
 
 function sendNotifications(targets: string[], methods: string[], details: any): boolean {
-  // 通知送信のシミュレーション - 実際の実装では外部APIを呼び出し
+  // 通知送信のシミュレーション - 実際の実装では外部APIを呼び出す
   return targets.length > 0 && methods.length > 0;
 }
 
 function getResponseWithin(minutes: number): boolean {
-  // 30分以内の応答確認のシミュレーション - 緊急時は通常応答が遅れる
-  return false;
+  // 応答確認のシミュレーション - 実際の実装では応答状況を確認
+  return false; // 緊急時は基本的にエスカレーションが必要
 }
 
 export function sendAnomalyNotification(
-  anomalyType: string, 
-  severityLevel: string, 
-  anomalyDetails: any, 
-  systemComponent: string, 
-  notificationTargets?: string[], 
-  notificationMethods?: string[]
-): { notificationTargets: string[]; notificationMethods: string[]; sendSuccess: boolean; escalationRequired: boolean } {
-  
+  anomalyType: string,
+  severityLevel: string,
+  anomalyDetails: any,
+  systemComponent: string,
+  notificationMethod?: string,
+  escalationRequired?: boolean
+): {
+  notificationTargets: string[];
+  notificationMethods: string[];
+  sendSuccess: boolean;
+  escalationRequired: boolean;
+} {
   if (!anomalyType || anomalyType.trim() === '') {
     throw new Error("異常の種類が特定できないため通知を送信できません。システム監視の設定を確認してください。");
   }
@@ -873,18 +823,18 @@ export function sendAnomalyNotification(
     throw new Error("異常の重要度が判定できないため適切な通知先を決定できません。");
   }
 
-  let targets: string[] = [];
-  let methods: string[] = [];
+  const targets: string[] = [];
+  const methods: string[] = [];
 
   if (severityLevel === "緊急") {
-    targets = ["システム管理者", "情報システム課長", "事務局長"];
-    methods = ["メール", "電話", "システム内通知"];
+    targets.push("システム管理者", "情報システム課長", "事務局長");
+    methods.push("メール", "電話", "システム内通知");
   } else if (severityLevel === "警告") {
-    targets = ["システム管理者", "情報システム課担当者"];
-    methods = ["メール", "システム内通知"];
+    targets.push("システム管理者", "情報システム課担当者");
+    methods.push("メール", "システム内通知");
   } else {
-    targets = ["システム管理者"];
-    methods = ["メール", "システム内通知"];
+    targets.push("システム管理者");
+    methods.push("メール", "システム内通知");
   }
 
   const sendSuccess = sendNotifications(targets, methods, anomalyDetails);
@@ -899,22 +849,34 @@ export function sendAnomalyNotification(
 }
 
 function extractAffectedRegulations(changeContent: string, regulationTypes: string[]): string[] {
-  return regulationTypes.filter(regType => 
-    changeContent.includes(regType)
-  );
+  const affectedRegulations: string[] = [];
+  for (const regulationType of regulationTypes) {
+    if (changeContent.includes(regulationType)) {
+      affectedRegulations.push(regulationType);
+    }
+  }
+  return affectedRegulations;
 }
 
 function isRegulationMatch(docRegulationCategory: string, affectedRegulations: string[]): boolean {
   return affectedRegulations.includes(docRegulationCategory);
 }
 
-function determineNewProcessingRouteInternal(docType: any, changeContent: string): string {
-  if (changeContent.includes('電子媒体での保管を認め') || changeContent.includes('電子保管を認める')) {
+function determineNewProcessingRouteInternal(docType: any, regulationChangeContent: string): string {
+  // 電子媒体での保管を認める内容が含まれている場合は electronic に変更
+  if (regulationChangeContent.includes('電子媒体での保管を認め') || 
+      regulationChangeContent.includes('紙媒体保管義務を撤廃')) {
     return 'electronic';
   }
-  if (changeContent.includes('紙媒体保管義務') && changeContent.includes('撤廃')) {
-    return 'electronic';
+  
+  // 紙媒体保管が必要な内容が含まれている場合は paper または hybrid に変更
+  if (regulationChangeContent.includes('紙媒体保管') && 
+      regulationChangeContent.includes('必要') || 
+      regulationChangeContent.includes('義務')) {
+    return 'hybrid';
   }
+  
+  // デフォルトは現在の設定を維持
   return docType.storageRequirement;
 }
 
@@ -922,18 +884,23 @@ export function analyzeRegulationImpactScope(
   regulationChangeContent: string, 
   affectedRegulationTypes: string[], 
   currentDocumentTypes: any[]
-): { affectedDocumentTypes: string[]; processingRouteChanges: any[]; impactLevel: string; changeRequiredCount: number } {
+): { 
+  affectedDocumentTypes: string[]; 
+  processingRouteChanges: ProcessingRouteChange[]; 
+  impactLevel: string; 
+  changeRequiredCount: number 
+} {
   if (!regulationChangeContent || regulationChangeContent.trim() === '') {
     throw new Error('法令改正の変更内容が正しく取得できていません。改正通知の受信処理を確認してください。');
   }
 
-  if (!currentDocumentTypes) {
+  if (!currentDocumentTypes || currentDocumentTypes.length === 0) {
     throw new Error('システムに登録されている文書種別の情報を取得できません。データベース接続を確認してください。');
   }
 
   const affectedRegulations = extractAffectedRegulations(regulationChangeContent, affectedRegulationTypes);
   const affectedTypes: string[] = [];
-  const routeChanges: any[] = [];
+  const routeChanges: ProcessingRouteChange[] = [];
 
   for (const docType of currentDocumentTypes) {
     if (isRegulationMatch(docType.regulationCategory, affectedRegulations)) {

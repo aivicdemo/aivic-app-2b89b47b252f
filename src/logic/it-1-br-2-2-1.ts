@@ -2,8 +2,6 @@
 // slug: it-1-br-2-2-1
 // 関数: validateApplicationInput, validateApplicationAmountAndPeriod, determineApprovalHierarchy, determineApprovalAuthority, determineApprovalDecision, determineNextApprover, setApproverAuthorityLevel, handleSystemFailureAlternativeProcess
 
-export interface BudgetLimits { [documentType: string]: { minAmount: number; maxAmount: number } }
-
 export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[] }
 
 export interface AmountPeriodValidationResult { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean }
@@ -16,17 +14,19 @@ export interface ApprovalDecisionResult { decision: string; reason: string; cond
 
 export interface NextApproverResult { nextApprover: string | null; processingRoute: string; isSubsidyRelated: boolean; requiresPaperStorage: boolean }
 
-export interface AuthorityLevelResult { requiredAuthorityLevel: string; approverRoles: string[]; escalationRequired: boolean }
+export interface ApproverAuthorityLevelResult { requiredAuthorityLevel: string; approverRoles: string[]; escalationRequired: boolean }
 
 export interface SystemFailureResult { alternativeProcess: string; notificationTargets: string[]; dataRecoveryPlan: string; estimatedRecoveryTime: number }
 
+export interface BudgetLimits { [documentType: string]: { minAmount: number; maxAmount: number } }
+
 function isValidApplicationType(applicationType: string): boolean {
-  const validTypes = ['補助金申請', '設備申請', '人事申請', '予算申請', '研究申請', '契約申請'];
+  const validTypes = ['補助金申請', '設備申請', '人事申請', '予算申請', '研修申請', '出張申請', '契約申請'];
   return validTypes.includes(applicationType);
 }
 
 function isValidDepartment(department: string): boolean {
-  const validDepartments = ['研究推進課', '総務課', '経理課', '人事課', '企画課', '技術課'];
+  const validDepartments = ['研究推進課', '総務課', '経理課', '人事課', '企画課', '営業課', '開発課', '製造課'];
   return validDepartments.includes(department);
 }
 
@@ -77,42 +77,42 @@ export function validateApplicationAmountAndPeriod(
   documentType: string,
   budgetLimits: BudgetLimits
 ): AmountPeriodValidationResult {
-  // 申請金額の基本チェック
+  // 申請金額の基本検証
   if (applicationAmount <= 0) {
     throw new Error("申請金額は正の数値で入力してください");
   }
 
-  const budgetLimit = budgetLimits[documentType];
+  // 日付形式の検証
+  const startDate = new Date(implementationStartDate);
+  const endDate = new Date(implementationEndDate);
   
-  // 申請金額が予算上限の150%を超過している場合のチェック
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw new Error("実施期間は有効な日付形式で入力してください");
+  }
+
+  // 予算制限の取得
+  const budgetLimit = budgetLimits[documentType];
+  if (!budgetLimit) {
+    throw new Error("指定された文書種別の予算制限が見つかりません");
+  }
+
+  // 150%超過チェック（例外をスロー）
   if (applicationAmount > budgetLimit.maxAmount * 1.5) {
     throw new Error("申請金額が大幅に予算上限を超過しています。金額を見直してください");
   }
 
+  // 申請金額の妥当性チェック
   const isAmountValid = applicationAmount >= budgetLimit.minAmount && applicationAmount <= budgetLimit.maxAmount;
-  
-  let startDate: Date;
-  let endDate: Date;
-  
-  try {
-    startDate = new Date(implementationStartDate);
-    endDate = new Date(implementationEndDate);
-    
-    // 無効な日付の場合、getTime()がNaNを返す
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      throw new Error("実施期間は有効な日付形式で入力してください");
-    }
-  } catch (error) {
-    throw new Error("実施期間は有効な日付形式で入力してください");
-  }
-  
+
+  // 実施期間の妥当性チェック
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // 時刻を00:00:00にリセット
+  today.setHours(0, 0, 0, 0); // 時間部分をリセットして日付のみで比較
   startDate.setHours(0, 0, 0, 0);
   endDate.setHours(0, 0, 0, 0);
   
   const isPeriodValid = startDate >= today && endDate > startDate;
-  
+
+  // エラーメッセージの生成
   const validationErrors: string[] = [];
   if (!isAmountValid) {
     validationErrors.push("申請金額が規定範囲外です");
@@ -120,10 +120,16 @@ export function validateApplicationAmountAndPeriod(
   if (!isPeriodValid) {
     validationErrors.push("実施期間が不正です");
   }
-  
+
+  // 承認可能かどうかの判定
   const canProceed = isAmountValid && isPeriodValid;
-  
-  return { isAmountValid, isPeriodValid, validationErrors, canProceed };
+
+  return {
+    isAmountValid,
+    isPeriodValid,
+    validationErrors,
+    canProceed
+  };
 }
 
 function getApproversByLevel(approvalLevel: string, applicantDepartment: string): string[] {
@@ -132,13 +138,16 @@ function getApproversByLevel(approvalLevel: string, applicantDepartment: string)
   } else if (approvalLevel === "部長承認") {
     return ["部長"];
   } else if (approvalLevel === "理事承認") {
-    // SCEN-428のテストケースで期待される階層的な承認者リスト
-    if (applicantDepartment && (applicantDepartment.includes("研究推進") || applicantDepartment.includes("学術"))) {
-      return ["課長", "部長", "理事"];
-    }
     return ["理事"];
   }
   return [];
+}
+
+function getApproversForHighestLevel(approvalLevel: string, applicantDepartment: string): string[] {
+  if (approvalLevel === "理事承認") {
+    return ["課長", "部長", "理事"];
+  }
+  return getApproversByLevel(approvalLevel, applicantDepartment);
 }
 
 export function determineApprovalHierarchy(
@@ -154,12 +163,12 @@ export function determineApprovalHierarchy(
   if (!applicantDepartment || applicantDepartment.trim() === "") {
     throw new Error("承認ルート設定のため、所属部署を入力してください");
   }
-  
+
   // 1億円超過の警告（処理は続行）
   if (applicationAmount > 100000000) {
     console.warn("高額申請のため、理事会での特別承認が必要になる可能性があります");
   }
-  
+
   let approvalLevel = "";
   let estimatedDays = 0;
   let requiresPaperApproval = false;
@@ -186,14 +195,12 @@ export function determineApprovalHierarchy(
     }
   }
   
-  const approvers = getApproversByLevel(approvalLevel, applicantDepartment);
-  
-  return {
-    approvalLevel,
-    approvers,
-    estimatedDays,
-    requiresPaperApproval
-  };
+  // 最高額（1億円）の場合は全階層の承認者を返す
+  const approvers = applicationAmount >= 100000000 
+    ? getApproversForHighestLevel(approvalLevel, applicantDepartment)
+    : getApproversByLevel(approvalLevel, applicantDepartment);
+    
+  return { approvalLevel, approvers, estimatedDays, requiresPaperApproval };
 }
 
 function determineRequiredPosition(applicationType: string, applicationAmount: number): string {
@@ -209,35 +216,27 @@ function determineRequiredPosition(applicationType: string, applicationAmount: n
   
   if (applicationAmount >= 1000000) {
     return "部長";
-  } else if (applicationAmount >= 300000) {
-    return "課長";
   } else {
-    return "主任";
+    return "課長";
   }
 }
 
 function checkAuthorityLevel(approverPosition: string, requiredPosition: string): boolean {
-  const positionHierarchy = ["主任", "課長", "部長", "理事", "役員"];
+  const positionHierarchy = ["課長", "部長", "理事"];
   const approverLevel = positionHierarchy.indexOf(approverPosition);
   const requiredLevel = positionHierarchy.indexOf(requiredPosition);
-  
-  if (approverLevel === -1 || requiredLevel === -1) {
-    return false;
-  }
   
   return approverLevel >= requiredLevel;
 }
 
 function findNextApprover(requiredPosition: string): string {
-  const positionToApprover = {
-    "主任": "課長",
-    "課長": "部長", 
-    "部長": "理事",
-    "理事": "役員",
-    "役員": "役員"
-  };
-  
-  return positionToApprover[requiredPosition] || "理事";
+  if (requiredPosition === "理事") {
+    return "理事";
+  } else if (requiredPosition === "部長") {
+    return "部長";
+  } else {
+    return "課長";
+  }
 }
 
 export function determineApprovalAuthority(
@@ -263,42 +262,36 @@ export function determineApprovalAuthority(
   
   if (!hasAuthority) {
     const nextApprover = findNextApprover(requiredPosition);
-    return {
-      hasAuthority: false,
-      requiredPosition,
-      nextApprover,
-      processingRoute: "escalate"
-    };
+    return { hasAuthority: false, requiredPosition, nextApprover, processingRoute: "escalate" };
   }
   
-  const processingRoute = approvalAction === "approve" ? "approved" : 
-                         approvalAction === "reject" ? "rejected" : "returned";
-  
-  return {
-    hasAuthority: true,
-    requiredPosition,
-    nextApprover: null,
-    processingRoute
-  };
+  const processingRoute = approvalAction === "approve" ? "approved" : approvalAction === "reject" ? "rejected" : "returned";
+  return { hasAuthority: true, requiredPosition, nextApprover: null, processingRoute };
 }
 
 function calculateDeficiencySeverity(deficiencyItems: string[]): number {
-  let totalScore = 0;
+  if (deficiencyItems.length === 0) return 0;
+  
+  let maxSeverity = 0;
   for (const item of deficiencyItems) {
     const lowerItem = item.toLowerCase();
-    if (lowerItem.includes('必要書類') || lowerItem.includes('添付漏れ') || lowerItem.includes('金額') || lowerItem.includes('期間設定')) {
-      totalScore += 3;
-    } else if (lowerItem.includes('重大') || lowerItem.includes('重要')) {
-      totalScore += 4;
+    if (lowerItem.includes('必要書類') || lowerItem.includes('添付漏れ') || lowerItem.includes('金額') || lowerItem.includes('記載ミス')) {
+      maxSeverity = Math.max(maxSeverity, 8);
+    } else if (lowerItem.includes('期間設定') || lowerItem.includes('誤り')) {
+      maxSeverity = Math.max(maxSeverity, 7);
+    } else if (lowerItem.includes('重大')) {
+      maxSeverity = Math.max(maxSeverity, 9);
+    } else if (lowerItem.includes('軽微')) {
+      maxSeverity = Math.max(maxSeverity, 3);
     } else {
-      totalScore += 1;
+      maxSeverity = Math.max(maxSeverity, 5);
     }
   }
-  return totalScore;
+  return maxSeverity;
 }
 
 function generateConditionalRequirements(deficiencyItems: string[]): string[] {
-  return deficiencyItems.map(item => `${item}の修正`);
+  return deficiencyItems.map(item => `${item}の修正対応`);
 }
 
 export function determineApprovalDecision(
@@ -307,17 +300,16 @@ export function determineApprovalDecision(
   subsidyRelated: boolean,
   urgencyLevel: number
 ): ApprovalDecisionResult {
-  if (!documentContent || documentContent.trim() === '') {
+  if (documentContent === "") {
     throw new Error("申請書類の内容が入力されていません。承認判定を行うことができません。");
+  }
+
+  if (urgencyLevel < 1 || urgencyLevel > 5) {
+    console.warn("緊急度は1から5の範囲で入力してください。");
   }
 
   if (deficiencyItems.length === 0) {
     console.warn("不備項目が入力されていません。承認判定を行うには不備の有無を確認してください。");
-  }
-
-  const clampedUrgencyLevel = Math.max(1, Math.min(5, urgencyLevel));
-  if (urgencyLevel < 1 || urgencyLevel > 5) {
-    console.warn("緊急度は1から5の範囲で入力してください。");
   }
 
   const severityScore = calculateDeficiencySeverity(deficiencyItems);
@@ -341,7 +333,7 @@ export function determineApprovalDecision(
     };
   }
 
-  if (deficiencyCount >= 1 && clampedUrgencyLevel >= 4) {
+  if (deficiencyCount >= 1 && urgencyLevel >= 4) {
     const requirements = generateConditionalRequirements(deficiencyItems);
     return {
       decision: "conditional",
@@ -362,7 +354,7 @@ export function determineApprovalDecision(
 function analyzeSubsidyKeywords(title: string, content: string): number {
   const subsidyKeywords = [
     '補助金', '科研費', '科学研究費', '運営費交付金', '設備整備費', 
-    '研究費', '文部科学省', '基盤研究', '設備費', '交付金'
+    '文部科学省', '基盤研究', '研究費', '交付金', '助成金'
   ];
   
   const text = (title + ' ' + content).toLowerCase();
@@ -370,16 +362,18 @@ function analyzeSubsidyKeywords(title: string, content: string): number {
   let matchCount = 0;
   
   subsidyKeywords.forEach(keyword => {
-    if (text.includes(keyword.toLowerCase())) {
-      matchCount++;
+    const regex = new RegExp(keyword, 'gi');
+    const matches = text.match(regex);
+    if (matches) {
+      matchCount += matches.length;
     }
   });
   
-  return matchCount / subsidyKeywords.length;
+  return totalWords > 0 ? matchCount / totalWords : 0;
 }
 
 function checkMoeRequirements(title: string): boolean {
-  const moeKeywords = ['科学研究費', '科研費', '運営費交付金', '文部科学省'];
+  const moeKeywords = ['文部科学省', '科研費', '科学研究費', '運営費交付金'];
   return moeKeywords.some(keyword => title.includes(keyword));
 }
 
@@ -388,14 +382,16 @@ function determineNextApproverByRole(currentRole: string, isSubsidyRelated: bool
     return null;
   }
   
-  const hierarchy: { [key: string]: string } = {
-    '係長': '課長',
-    '課長': '部長',
-    '部長': '理事',
-    '理事': null
-  };
+  if (decision === '承認' || decision === 'approve') {
+    const hierarchy = ['係長', '課長', '部長', '理事'];
+    const currentIndex = hierarchy.indexOf(currentRole);
+    
+    if (currentIndex >= 0 && currentIndex < hierarchy.length - 1) {
+      return hierarchy[currentIndex + 1];
+    }
+  }
   
-  return hierarchy[currentRole] || null;
+  return null;
 }
 
 export function determineNextApprover(
@@ -431,7 +427,7 @@ export function setApproverAuthorityLevel(
   paperStorageRequired: boolean,
   applicantDepartment: string,
   budgetAmount: number
-): AuthorityLevelResult {
+): ApproverAuthorityLevelResult {
   // バリデーション
   if (budgetAmount < 0) {
     throw new Error("予算金額は0以上の値を入力してください");
@@ -441,44 +437,35 @@ export function setApproverAuthorityLevel(
     throw new Error("申請者の所属部署を選択してください");
   }
 
-  // 金額による判定
+  // 業務ロジック
   const isHighBudget = budgetAmount > 5000000;
   const isVeryHighBudget = budgetAmount > 10000000;
-  
-  // 高権限が必要かどうかの判定
   const needsHighAuthority = subsidyRelated || isHighBudget;
   
-  // 必要な権限レベルの決定
   const requiredAuthorityLevel = needsHighAuthority ? "department_head" : "section_chief";
-  
-  // 承認者役職の設定
   const approverRoles = [requiredAuthorityLevel];
+  
   if (paperStorageRequired) {
     approverRoles.push("administrative_director");
   }
   
-  // エスカレーション判定
   const escalationRequired = isVeryHighBudget;
   
-  return {
-    requiredAuthorityLevel,
-    approverRoles,
-    escalationRequired
-  };
+  return { requiredAuthorityLevel, approverRoles, escalationRequired };
 }
 
 function calculateRecoveryTime(failureType: string): number {
   switch (failureType) {
     case "approval_route_determination_error":
       return 240;
-    case "database_connection":
+    case "database_error":
       return 120;
-    case "network_failure":
+    case "network_error":
       return 60;
-    case "server_overload":
-      return 180;
+    case "authentication_error":
+      return 30;
     default:
-      return 120;
+      return 180;
   }
 }
 

@@ -2,18 +2,24 @@
 // slug: it-1-br-2-1-1
 // 関数: validateApplicationInput, validateApplicationAmountAndPeriod, classifyDocumentTypeAndRoute, determineDocumentTypeAndRoute, checkMoeComplianceRequirements, determineDigitalizationEligibility, determineProcessingRoute, handleDocumentClassificationException, determineDocumentStorageMethod, determineDocumentAcceptanceEligibility, handleSystemFailureAlternativeProcess
 
-export interface DocumentClassificationResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean; }
+export interface DocumentClassificationResult { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean; }
 
 export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[]; }
+
+export interface ExtendedDocumentResult { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean; isSubsidyRelated: boolean; requiresPaperStorage: boolean; }
+
+export interface ProcessingRouteResult { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean; approvalFlow: string; }
+
+export interface AcceptanceEligibilityResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean; acceptanceEligible: boolean; }
+
+export interface ExceptionHandlingResult { finalDocumentType: string; processingRoute: string; exceptionReason: string; learningData: { documentTitle: string; documentContent: string; finalDocumentType: string; exceptionReason: string; }; }
 
 export interface ComplianceCheckResult { complianceStatus: string; paperStorageRequired: boolean; processingRoute: string; riskLevel: string; }
 
 export interface SystemFailureResult { alternativeProcess: string; notificationTargets: string[]; dataRecoveryPlan: string; estimatedRecoveryTime: number; }
 
-export interface ExceptionHandlingResult { finalDocumentType: string; processingRoute: string; exceptionReason: string; learningData: object; }
-
 function isValidApplicationType(applicationType: string): boolean {
-  const validTypes = ['補助金申請', '設備申請', '人事申請', '研究申請', '予算申請'];
+  const validTypes = ['補助金申請', '設備申請', '人事申請', '予算申請', '研究申請'];
   return validTypes.includes(applicationType);
 }
 
@@ -58,7 +64,7 @@ export function validateApplicationInput(
   }
 
   if (!isValidApplicationType(applicationType)) {
-    errors.push("申請種別を正しく選択してください");
+    throw new Error("申請種別を選択してください。");
   }
 
   if (!applicantDepartment) {
@@ -66,7 +72,7 @@ export function validateApplicationInput(
   }
 
   if (!isValidDepartment(applicantDepartment)) {
-    errors.push("所属部署を正しく入力してください");
+    throw new Error("所属部署を入力してください。");
   }
 
   if (!urgencyLevel || !isValidUrgencyLevel(urgencyLevel)) {
@@ -84,13 +90,13 @@ export function validateApplicationAmountAndPeriod(
   implementationEndDate: string,
   documentType: string,
   budgetLimits: object
-): object {
-  // 申請金額の基本検証
+): { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean; } {
+  // 申請金額の妥当性チェック
   if (applicationAmount <= 0 || !Number.isFinite(applicationAmount)) {
     throw new Error("申請金額は正の数値で入力してください");
   }
 
-  // 日付形式の検証
+  // 日付形式の妥当性チェック
   const startDate = new Date(implementationStartDate);
   const endDate = new Date(implementationEndDate);
   
@@ -98,20 +104,16 @@ export function validateApplicationAmountAndPeriod(
     throw new Error("実施期間は有効な日付形式で入力してください");
   }
 
-  // 予算制限の取得
   const budgetLimit = (budgetLimits as any)[documentType];
   
-  // 金額妥当性チェック
+  // 申請金額の範囲チェック
   const isAmountValid = budgetLimit && 
     applicationAmount >= budgetLimit.minAmount && 
     applicationAmount <= budgetLimit.maxAmount;
 
-  // 期間妥当性チェック
+  // 実施期間の妥当性チェック
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // 時間部分をリセットして日付のみで比較
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
-  
+  today.setHours(0, 0, 0, 0); // 時刻をリセットして日付のみで比較
   const isPeriodValid = startDate >= today && endDate > startDate;
 
   // エラーメッセージの生成
@@ -130,7 +132,6 @@ export function validateApplicationAmountAndPeriod(
     console.warn("申請金額が大幅に予算上限を超過しています。金額を見直してください");
   }
 
-  // 承認可否の判定
   const canProceed = isAmountValid && isPeriodValid;
 
   return {
@@ -145,13 +146,13 @@ function calculateSubsidyKeywordMatch(title: string, content: string): number {
   const subsidyKeywords = [
     '科研費', '科学研究費', '補助金', '運営費交付金', '設備整備費',
     '研究費', '助成金', '交付金', '文部科学省', '研究機器',
-    '研究設備', '研究環境', '併用', '効率的'
+    '研究設備', '研究環境', '研究推進'
   ];
   
   const text = (title + ' ' + content).toLowerCase();
   const totalWords = text.split(/\s+/).length;
-  
   let matchCount = 0;
+  
   subsidyKeywords.forEach(keyword => {
     const regex = new RegExp(keyword, 'gi');
     const matches = text.match(regex);
@@ -164,7 +165,7 @@ function calculateSubsidyKeywordMatch(title: string, content: string): number {
 }
 
 function determineDocumentTypeInternal(title: string, department: string): string {
-  const subsidyKeywords = ['科研費', '科学研究費', '補助金', '運営費交付金', '設備整備費'];
+  const subsidyKeywords = ['科研費', '補助金', '交付金', '研究費'];
   const hasSubsidyKeyword = subsidyKeywords.some(keyword => title.includes(keyword));
   
   if (hasSubsidyKeyword) {
@@ -194,13 +195,13 @@ export function classifyDocumentTypeAndRoute(
   if (!applicantDepartment) {
     throw new Error("所属部署を選択してください");
   }
-
+  
   const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
   const subsidyRelated = keywordScore >= 0.7;
   const documentType = determineDocumentTypeInternal(documentTitle, applicantDepartment);
   const paperStorageRequired = subsidyRelated && isMoeRequiredPaperStorageInternal(documentType);
   const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
-
+  
   return {
     documentType,
     processingRoute,
@@ -209,10 +210,11 @@ export function classifyDocumentTypeAndRoute(
   };
 }
 
-function calculateSubsidyKeywordMatch(title: string, content: string): number {
+function calculateSubsidyKeywordScore(title: string, content: string): number {
   const subsidyKeywords = [
-    '科研費', '科学研究費', '運営費交付金', '設備整備費', '補助金', 
-    '文部科学省', '研究費', '助成', '交付金', '基盤研究', '挑戦的研究'
+    '科研費', '科学研究費', '運営費交付金', '補助金', '助成金', 
+    '設備整備費', '文部科学省', '研究費', '交付金', '基盤研究',
+    '挑戦的研究', '若手研究', '特別研究員奨励費'
   ];
   
   const text = (title + ' ' + content).toLowerCase();
@@ -220,55 +222,59 @@ function calculateSubsidyKeywordMatch(title: string, content: string): number {
   let matchCount = 0;
   
   subsidyKeywords.forEach(keyword => {
-    if (text.includes(keyword.toLowerCase())) {
-      matchCount += keyword.length;
+    const regex = new RegExp(keyword, 'gi');
+    const matches = text.match(regex);
+    if (matches) {
+      matchCount += matches.length;
     }
   });
   
-  return Math.min(matchCount / Math.max(totalWords, 1), 1.0);
+  return Math.min(matchCount / Math.max(totalWords * 0.1, 1), 1.0);
 }
 
-function checkResearchDepartment(department: string): boolean {
+function isResearchDepartment(department: string): boolean {
   const researchDepts = ['研究科', '理学部', '工学部', '医学部', '研究推進課', '研究室'];
   return researchDepts.some(dept => department.includes(dept));
 }
 
-function classifyDocumentTypeInternal(title: string, content: string, subsidyRelated: boolean): string {
-  if (subsidyRelated) {
-    if (title.includes('科研費') || title.includes('科学研究費') || content.includes('科学研究費')) {
+function requiresPaperStorageForMoe(documentType: string, title: string): boolean {
+  const moeRequiredTypes = ['補助金申請', '補助金申請書'];
+  const moeKeywords = ['文部科学省', '科研費', '運営費交付金'];
+  
+  if (!moeRequiredTypes.includes(documentType)) {
+    return false;
+  }
+  
+  return moeKeywords.some(keyword => title.includes(keyword));
+}
+
+function classifyDocumentTypeInternal(title: string, content: string, isSubsidy: boolean, department: string): string {
+  if (isSubsidy) {
+    if (title.includes('申請書')) {
       return '補助金申請書';
     }
     return '補助金申請';
   }
   
-  if (title.includes('研究') || content.includes('研究')) {
+  if (isResearchDepartment(department) && (title.includes('研究') || content.includes('研究'))) {
     return '研究関連書類';
   }
   
+  if (title.includes('申請書')) {
+    return '一般申請書';
+  }
+  
   return '一般申請';
-}
-
-function requiresPaperStorageInternal(title: string, content: string, subsidyRelated: boolean): boolean {
-  if (!subsidyRelated) return false;
-  
-  const moeRequirements = ['文部科学省', '科研費', '科学研究費', '運営費交付金'];
-  const text = (title + ' ' + content).toLowerCase();
-  
-  return moeRequirements.some(req => text.includes(req.toLowerCase()));
 }
 
 export function determineDocumentTypeAndRoute(
   documentTitle: string, 
   documentContent: string, 
   applicantDepartment: string
-): object {
+): ExtendedDocumentResult {
   // 制約チェック
   if (!documentTitle || documentTitle.trim() === '') {
     throw new Error('申請書類のタイトルを入力してください');
-  }
-  
-  if (documentTitle.length < 10) {
-    throw new Error('申請書類のタイトルは10文字以上で入力してください');
   }
   
   if (!documentContent || documentContent.trim() === '') {
@@ -279,29 +285,25 @@ export function determineDocumentTypeAndRoute(
     throw new Error('申請内容が短すぎる可能性があります。内容を確認してください');
   }
   
-  if (documentContent.length < 50) {
-    throw new Error('申請書類の内容は50文字以上で入力してください');
-  }
-  
   if (!applicantDepartment || applicantDepartment.trim() === '') {
     throw new Error('申請者の所属部署を選択してください');
   }
-
-  // キーワードスコア計算
-  const keywordScore = calculateSubsidyKeywordMatch(documentTitle, documentContent);
-  const isResearchDept = checkResearchDepartment(applicantDepartment);
+  
+  // 補助金関連度計算
+  const keywordScore = calculateSubsidyKeywordScore(documentTitle, documentContent);
+  const isResearchDept = isResearchDepartment(applicantDepartment);
   const threshold = isResearchDept ? 0.6 : 0.7;
   const subsidyRelated = keywordScore >= threshold;
   
   // 文書種別判定
-  const documentType = classifyDocumentTypeInternal(documentTitle, documentContent, subsidyRelated);
+  const documentType = classifyDocumentTypeInternal(documentTitle, documentContent, subsidyRelated, applicantDepartment);
   
   // 紙保管要否判定
-  const paperStorageRequired = requiresPaperStorageInternal(documentTitle, documentContent, subsidyRelated);
+  const paperStorageRequired = subsidyRelated && requiresPaperStorageForMoe(documentType, documentTitle);
   
   // 処理ルート決定
   const processingRoute = paperStorageRequired ? 'hybrid' : 'electronic';
-
+  
   return {
     documentType,
     processingRoute,
@@ -312,35 +314,17 @@ export function determineDocumentTypeAndRoute(
   };
 }
 
-interface MoeKeywordMatch {
-  score: number;
-  matchedKeywords: string[];
+function calculateMoeKeywordMatch(title: string, content: string, keywords: string[]): number {
+  const text = (title + ' ' + content).toLowerCase();
+  const matchedKeywords = keywords.filter(keyword => 
+    text.includes(keyword.toLowerCase())
+  );
+  return matchedKeywords.length / keywords.length;
 }
 
-function calculateMoeKeywordMatchInternal(title: string, content: string, requirements: string[]): MoeKeywordMatch {
-  const combinedText = (title + ' ' + content).toLowerCase();
-  const matchedKeywords: string[] = [];
-  
-  for (const keyword of requirements) {
-    if (combinedText.includes(keyword.toLowerCase())) {
-      matchedKeywords.push(keyword);
-    }
-  }
-  
-  const score = requirements.length > 0 ? matchedKeywords.length / requirements.length : 0;
-  return { score, matchedKeywords };
-}
-
-function checkMoeRequirementMatchInternal(documentType: string, requirements: string[]): boolean {
-  const paperStorageRequiredTypes = [
-    '補助金申請書',
-    '助成金申請書',
-    '科研費申請書',
-    '運営費交付金申請書',
-    '設備整備費申請書'
-  ];
-  
-  return paperStorageRequiredTypes.some(type => 
+function checkMoeRequirementMatch(documentType: string, keywords: string[]): boolean {
+  const subsidyRelatedTypes = ['補助金申請書', '設備導入申請書', '研究関連書類'];
+  return subsidyRelatedTypes.some(type => 
     documentType.toLowerCase().includes(type.toLowerCase())
   );
 }
@@ -349,7 +333,7 @@ export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
   documentType: string,
-  moeRequirements?: string[]
+  subsidyKeywords: string[]
 ): ComplianceCheckResult {
   // バリデーション
   if (!documentTitle) {
@@ -367,18 +351,15 @@ export function checkMoeComplianceRequirements(
   if (!documentType) {
     throw new Error("書類種別の分類が完了していません。先に文書種別の確認を行ってください。");
   }
-  
-  const requirements = moeRequirements || [];
-  
+
   // キーワードマッチング計算
-  const keywordMatch = calculateMoeKeywordMatchInternal(documentTitle, documentContent, requirements);
-  const keywordScore = keywordMatch.score;
+  const keywordScore = calculateMoeKeywordMatch(documentTitle, documentContent, subsidyKeywords);
   
-  // 補助金関連判定（60%以上で関連と判定）
+  // 補助金関連判定
   const isSubsidyRelated = keywordScore >= 0.6;
   
-  // 紙保管要件チェック
-  const paperStorageRequired = isSubsidyRelated && checkMoeRequirementMatchInternal(documentType, requirements);
+  // 紙保管要件判定
+  const paperStorageRequired = isSubsidyRelated && checkMoeRequirementMatch(documentType, subsidyKeywords);
   
   // 処理ルート決定
   const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
@@ -395,7 +376,7 @@ export function checkMoeComplianceRequirements(
   } else {
     riskLevel = "low";
   }
-  
+
   return {
     complianceStatus,
     paperStorageRequired,
@@ -410,7 +391,6 @@ export function determineDigitalizationEligibility(
   documentType: string,
   subsidyRelevanceScore: number
 ): DocumentClassificationResult {
-  // 制約チェック
   if (!documentTitle || documentTitle.trim() === "") {
     throw new Error("申請書類のタイトルが入力されていません。タイトルを入力してください。");
   }
@@ -423,7 +403,6 @@ export function determineDigitalizationEligibility(
     console.warn("文書種別の分類が完了していません。手動で種別を確認してください。");
   }
 
-  // 業務ロジック実装
   const subsidyRelated = subsidyRelevanceScore >= 0.7;
   const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書", "監査資料"];
   const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
@@ -442,7 +421,7 @@ export function determineProcessingRoute(
   subsidyRelatedScore: number,
   documentTitle: string,
   documentContent: string
-): object {
+): ProcessingRouteResult {
   // 制約チェック
   if (!documentTitle || documentTitle.trim() === "") {
     throw new Error("申請書類のタイトルを入力してください");
@@ -474,9 +453,9 @@ export function determineProcessingRoute(
 }
 
 function determineProcessingRouteInternal(documentType: string): string {
-  // 一般的な申請書類は電子処理、特殊なものはハイブリッド
-  const hybridTypes = ['補助金申請', '研究関連申請', '特殊申請'];
-  return hybridTypes.includes(documentType) ? 'hybrid' : 'electronic';
+  // 補助金関連の文書種別はハイブリッド処理、その他は電子処理
+  const subsidyRelatedTypes = ['補助金申請', '助成金申請', '研究費申請'];
+  return subsidyRelatedTypes.includes(documentType) ? 'hybrid' : 'electronic';
 }
 
 function generateExceptionReasonInternal(autoClassificationResult: string | null, staffObjection: string | null): string {
@@ -490,7 +469,12 @@ function generateExceptionReasonInternal(autoClassificationResult: string | null
   return '例外処理により手動判定に移行';
 }
 
-function createLearningDataInternal(documentTitle: string, documentContent: string, finalDocumentType: string, exceptionReason: string): object {
+function createLearningDataInternal(
+  documentTitle: string,
+  documentContent: string,
+  finalDocumentType: string,
+  exceptionReason: string
+) {
   return {
     documentTitle,
     documentContent,
@@ -524,12 +508,12 @@ export function handleDocumentClassificationException(
     };
   }
 
-  // フォールバック（通常はここに到達しない）
+  // 通常ケース（例外処理が不要な場合）
   const finalDocumentType = managerDecision;
   const processingRoute = determineProcessingRouteInternal(finalDocumentType);
   const exceptionReason = '例外処理により手動判定に移行';
   const learningData = createLearningDataInternal(documentTitle, documentContent, finalDocumentType, exceptionReason);
-  
+
   return {
     finalDocumentType,
     processingRoute,
@@ -538,15 +522,15 @@ export function handleDocumentClassificationException(
   };
 }
 
-function computeKeywordMatch(title: string, content: string, keywords: string[]): number {
-  if (keywords.length === 0) return 0;
+function computeKeywordMatch(documentTitle: string, documentContent: string, subsidyKeywords: string[]): number {
+  if (subsidyKeywords.length === 0) return 0;
   
-  const text = (title + ' ' + content).toLowerCase();
-  const matchedKeywords = keywords.filter(keyword => 
-    text.includes(keyword.toLowerCase())
+  const combinedText = (documentTitle + ' ' + documentContent).toLowerCase();
+  const matchedKeywords = subsidyKeywords.filter(keyword => 
+    combinedText.includes(keyword.toLowerCase())
   );
   
-  return matchedKeywords.length / keywords.length;
+  return matchedKeywords.length / subsidyKeywords.length;
 }
 
 function isMoeRequirement(documentType: string): boolean {
@@ -581,19 +565,14 @@ export function determineDocumentStorageMethod(
   };
 }
 
-function computeKeywordMatch(title: string, content: string, keywords: string[]): number {
-  const text = (title + " " + content).toLowerCase();
-  const matchedKeywords = keywords.filter(keyword => text.includes(keyword.toLowerCase()));
-  return matchedKeywords.length / keywords.length;
-}
+
 
 export function determineDocumentAcceptanceEligibility(
   documentTitle: string,
   documentContent: string,
   documentType: string
-): object {
-  // 制約チェック
-  if (!documentTitle || documentTitle.trim() === "") {
+): AcceptanceEligibilityResult {
+  if (!documentTitle) {
     throw new Error("申請書類のタイトルを入力してください");
   }
   
@@ -601,11 +580,10 @@ export function determineDocumentAcceptanceEligibility(
     throw new Error("申請書類の内容は10文字以上で入力してください");
   }
   
-  if (!documentType || documentType.trim() === "") {
+  if (!documentType) {
     throw new Error("文書種別を選択してください");
   }
 
-  // 業務ロジック実装
   const subsidyKeywords = ["補助金", "助成金", "文部科学省", "科研費", "運営費交付金"];
   const score = computeKeywordMatch(documentTitle, documentContent, subsidyKeywords);
   const subsidyRelated = score >= 0.7;
@@ -625,16 +603,16 @@ export function determineDocumentAcceptanceEligibility(
 
 function calculateRecoveryTime(failureType: string): number {
   switch (failureType) {
-    case 'system_crash':
+    case "system_crash":
       return 240;
-    case 'network_error':
+    case "network_issue":
       return 60;
-    case 'database_error':
+    case "database_error":
       return 120;
-    case 'server_overload':
+    case "server_overload":
       return 90;
     default:
-      return 120;
+      return 180;
   }
 }
 
@@ -652,8 +630,9 @@ export function handleSystemFailureAlternativeProcess(
     console.warn("障害の詳細が不明です。標準的な代替処理を開始します。");
   }
 
+  // 緊急度レベルの範囲チェック
   const clampedUrgencyLevel = Math.max(1, Math.min(10, urgencyLevel));
-  if (clampedUrgencyLevel !== urgencyLevel) {
+  if (urgencyLevel < 1 || urgencyLevel > 10) {
     console.warn("緊急度は1から10の範囲で指定してください。");
   }
 
