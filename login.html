@@ -6,16 +6,16 @@
   <title>ハイブリッド申請承認システムの構築 - ログイン画面</title>
   <style>
     :root {
-      --primary: #ff6b9d;
-      --primary-hover: #e55a8a;
-      --bg-main: #2c2c2c;
-      --bg-card: #383838;
-      --bg-sidebar: #333333;
-      --border: #4a4a4a;
-      --text: #f0f0f0;
-      --text-muted: #b8b8b8;
-      --top-bar-bg: #363636;
-      --top-bar-border: #4d4d4d;
+      --primary: #ff1493;
+      --primary-hover: #dc143c;
+      --bg-main: #fff0f5;
+      --bg-card: #ffe4e1;
+      --bg-sidebar: #ffeef0;
+      --border: #8b008b;
+      --text: #2f0a2f;
+      --text-muted: #4a1a4a;
+      --top-bar-bg: #ffb6c1;
+      --top-bar-border: #9932cc;
     }
 
     * {
@@ -25,41 +25,73 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg-main);
-      color: var(--text);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      color: var(--text);
+      background-image: 
+        radial-gradient(circle at 20% 80%, rgba(255, 20, 147, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(139, 0, 139, 0.1) 0%, transparent 50%);
     }
 
     .login-container {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 48px 40px;
       width: 100%;
       max-width: 400px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      margin: 20px;
     }
 
-    .login-header {
-      text-align: center;
-      margin-bottom: 32px;
+    .login-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 32px;
+      box-shadow: 
+        0 10px 25px rgba(139, 0, 139, 0.15),
+        0 0 0 1px rgba(255, 20, 147, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: conic-gradient(from 0deg, transparent, rgba(255, 20, 147, 0.03), transparent 30%);
+      animation: rotate 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes rotate {
+      to { transform: rotate(360deg); }
+    }
+
+    .login-content {
+      position: relative;
+      z-index: 1;
     }
 
     .login-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--text);
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
       margin-bottom: 8px;
+      color: var(--text);
+      text-shadow: 0 1px 2px rgba(139, 0, 139, 0.1);
     }
 
     .login-subtitle {
       font-size: 14px;
       color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 32px;
+      font-weight: 500;
     }
 
     .form-group {
@@ -69,109 +101,143 @@
     .form-label {
       display: block;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--text);
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .form-input {
       width: 100%;
       padding: 12px 16px;
       font-size: 16px;
-      background: var(--bg-main);
-      border: 1px solid var(--border);
+      border: 2px solid var(--border);
       border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
       color: var(--text);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: all 0.2s ease;
+      font-family: inherit;
     }
 
     .form-input:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+      box-shadow: 0 0 0 3px rgba(255, 20, 147, 0.1);
+      background: rgba(255, 255, 255, 0.95);
     }
 
     .form-input::placeholder {
       color: var(--text-muted);
+      opacity: 0.7;
     }
 
     .login-button {
       width: 100%;
-      padding: 12px 24px;
+      padding: 14px 24px;
       font-size: 16px;
       font-weight: 600;
-      background: var(--primary);
       color: white;
+      background: var(--primary);
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
+      transition: all 0.2s ease;
       margin-top: 8px;
+      font-family: inherit;
+      position: relative;
+      overflow: hidden;
     }
 
     .login-button:hover {
       background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(255, 20, 147, 0.3);
     }
 
     .login-button:active {
-      transform: translateY(1px);
+      transform: translateY(0);
     }
 
-    .login-footer {
-      margin-top: 32px;
-      text-align: center;
+    .login-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .login-button:hover::before {
+      left: 100%;
+    }
+
+    .sample-notice {
+      margin-top: 24px;
+      padding: 12px 16px;
+      background: rgba(139, 0, 139, 0.05);
+      border: 1px solid rgba(139, 0, 139, 0.2);
+      border-radius: 8px;
       font-size: 12px;
       color: var(--text-muted);
-      padding-top: 24px;
-      border-top: 1px solid var(--border);
+      text-align: center;
+      line-height: 1.4;
     }
 
     @media (max-width: 480px) {
-      .login-container {
+      .login-card {
         padding: 32px 24px;
+        margin: 16px;
+        border-radius: 12px;
+      }
+
+      .login-title {
+        font-size: 24px;
       }
     }
   </style>
 </head>
 <body>
   <div class="login-container">
-    <div class="login-header">
-      <h1 class="login-title" data-testid="login-title">ログイン</h1>
-      <p class="login-subtitle">ハイブリッド申請承認システムの構築</p>
-    </div>
-
-    <form data-testid="login-form" novalidate>
-      <div class="form-group">
-        <label class="form-label" for="username">ユーザー名</label>
-        <input
-          type="text"
-          id="username"
-          name="username"
-          class="form-input"
-          data-testid="username"
-          placeholder="ユーザー名を入力"
-        >
+    <div class="login-card">
+      <div class="login-content">
+        <h1 class="login-title" data-testid="login-title">ログイン</h1>
+        <p class="login-subtitle">ハイブリッド申請承認システムの構築</p>
+        
+        <form data-testid="login-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="username">ユーザー名</label>
+            <input 
+              type="text" 
+              id="username" 
+              name="username" 
+              class="form-input" 
+              data-testid="username"
+              placeholder="ユーザー名を入力"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="password">パスワード</label>
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input" 
+              data-testid="password"
+              placeholder="パスワードを入力"
+            >
+          </div>
+          
+          <button type="submit" class="login-button" data-testid="login-button">
+            ログイン
+          </button>
+        </form>
+        
+        <div class="sample-notice">
+          サンプル実装ではどの入力でもログインできます
+        </div>
       </div>
-
-      <div class="form-group">
-        <label class="form-label" for="password">パスワード</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          class="form-input"
-          data-testid="password"
-          placeholder="パスワードを入力"
-        >
-      </div>
-
-      <button type="submit" class="login-button" data-testid="login-button">
-        ログイン
-      </button>
-    </form>
-
-    <div class="login-footer">
-      サンプル実装ではどの入力でもログインできます
     </div>
   </div>
 
