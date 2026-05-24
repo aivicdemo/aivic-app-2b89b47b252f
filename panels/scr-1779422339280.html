@@ -1,701 +1,701 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ハイブリッド申請承認システム</title>
-  <script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ハイブリッド申請承認システム</title>
     <script>
+        <script>
 window.AIVIC_API_URL = "https://mkwmoife37uqyv4zhy4yhweozq0oddxn.lambda-url.us-east-1.on.aws/";
 window.AIVIC_APP_ID = "session-1779263354590";
 window.AIVIC_SYSTEM_NAME = "ハイブリッド申請承認システムの構築";
 window.AIVIC_TABLES = [{"tableName":"ユーザー","purpose":"ハイブリッド申請承認システムの利用者情報を管理し、申請者・承認者・管理者の権限制御と認証を行う","columns":[{"name":"ユーザーID","type":"uuid","required":true,"description":"ユーザーの一意識別子（主キー）"},{"name":"ユーザー名","type":"varchar(100)","required":true,"description":"システム内でのユーザー表示名"},{"name":"メールアドレス","type":"varchar(100)","required":true,"description":"ログイン認証および通知送信用のメールアドレス"},{"name":"パスワードハッシュ","type":"varchar(100)","required":true,"description":"ハッシュ化されたパスワード"},{"name":"所属部署","type":"varchar(100)","required":true,"description":"ユーザーの所属部署名"},{"name":"役職","type":"varchar(100)","required":false,"description":"ユーザーの役職・職位"},{"name":"権限レベル","type":"integer","required":true,"description":"システム権限レベル（1:一般申請者、2:承認者、3:管理者）"},{"name":"承認権限フラグ","type":"boolean","required":true,"description":"申請承認権限の有無"},{"name":"アクティブフラグ","type":"boolean","required":true,"description":"アカウントの有効/無効状態"},{"name":"最終ログイン日時","type":"timestamp","required":false,"description":"最後にログインした日時"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者","type":"uuid","required":true,"description":"レコード作成者のユーザーID"}]},{"tableName":"申請書類","purpose":"ハイブリッド申請承認システムにおける申請書類の管理","columns":[{"name":"申請書類ID","type":"uuid","required":true,"description":"申請書類の一意識別子"},{"name":"申請者ID","type":"uuid","required":true,"description":"申請を行ったユーザーのID"},{"name":"申請種別","type":"varchar(100)","required":true,"description":"申請の種類（休暇申請、経費申請、稟議等）"},{"name":"申請タイトル","type":"varchar(100)","required":true,"description":"申請書類のタイトル"},{"name":"申請内容","type":"text","required":true,"description":"申請の詳細内容"},{"name":"申請金額","type":"integer","required":false,"description":"申請に関わる金額（経費申請等で使用）"},{"name":"申請開始日","type":"timestamp","required":false,"description":"申請対象期間の開始日"},{"name":"申請終了日","type":"timestamp","required":false,"description":"申請対象期間の終了日"},{"name":"承認状態","type":"varchar(100)","required":true,"description":"承認の状態（申請中、承認済、却下、取下げ等）"},{"name":"現在承認者ID","type":"uuid","required":false,"description":"現在承認待ちの承認者ID"},{"name":"承認段階","type":"integer","required":true,"description":"現在の承認段階番号"},{"name":"最終承認者ID","type":"uuid","required":false,"description":"最終承認を行った承認者ID"},{"name":"最終承認日時","type":"timestamp","required":false,"description":"最終承認が完了した日時"},{"name":"緊急フラグ","type":"boolean","required":true,"description":"緊急申請かどうかのフラグ"},{"name":"添付ファイル有無","type":"boolean","required":true,"description":"添付ファイルがあるかどうか"},{"name":"備考","type":"text","required":false,"description":"申請に関する備考"},{"name":"作成日時","type":"timestamp","required":true,"description":"申請書類の作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"申請書類の最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"申請書類を作成したユーザーID"},{"name":"更新者ID","type":"uuid","required":true,"description":"申請書類を最後に更新したユーザーID"}]},{"tableName":"文書種別マスタ","purpose":"申請書類の種別を管理し、各文書種別の承認フローや設定を定義するマスタテーブル","columns":[{"name":"文書種別ID","type":"uuid","required":true,"description":"文書種別の一意識別子（主キー）"},{"name":"文書種別コード","type":"varchar(100)","required":true,"description":"文書種別の業務コード（検索・絞り込み用）"},{"name":"文書種別名","type":"varchar(100)","required":true,"description":"文書種別の表示名（画面表示・一覧表示用）"},{"name":"説明","type":"text","required":false,"description":"文書種別の詳細説明"},{"name":"承認段数","type":"integer","required":true,"description":"この文書種別の承認に必要な段数"},{"name":"自動承認フラグ","type":"boolean","required":true,"description":"条件により自動承認を行うかの設定"},{"name":"緊急申請可能フラグ","type":"boolean","required":true,"description":"緊急申請として提出可能かの設定"},{"name":"通知設定","type":"varchar(100)","required":true,"description":"通知方法の設定（メール、システム内通知等）"},{"name":"表示順","type":"integer","required":true,"description":"画面での表示順序"},{"name":"有効フラグ","type":"boolean","required":true,"description":"現在利用可能な文書種別かの判定"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"},{"name":"更新者ID","type":"uuid","required":true,"description":"レコード最終更新者のユーザーID"}]},{"tableName":"承認フロー定義","purpose":"申請書類の承認プロセスを定義し、文書種別ごとの承認ルートと承認者の順序を管理する","columns":[{"name":"承認フローID","type":"uuid","required":true,"description":"承認フロー定義の一意識別子（主キー）"},{"name":"文書種別ID","type":"uuid","required":true,"description":"文書種別マスタへの外部キー"},{"name":"承認フロー名","type":"varchar(100)","required":true,"description":"承認フローの名称"},{"name":"承認ステップ番号","type":"integer","required":true,"description":"承認の順序を示すステップ番号"},{"name":"承認者ユーザーID","type":"uuid","required":true,"description":"承認者のユーザーIDへの外部キー"},{"name":"承認者役職","type":"varchar(100)","required":false,"description":"承認者の役職名"},{"name":"必須承認フラグ","type":"boolean","required":true,"description":"このステップの承認が必須かどうか"},{"name":"並列承認フラグ","type":"boolean","required":true,"description":"前のステップと並列で承認可能かどうか"},{"name":"代理承認許可フラグ","type":"boolean","required":true,"description":"代理承認を許可するかどうか"},{"name":"承認期限日数","type":"integer","required":false,"description":"承認期限の日数"},{"name":"有効開始日","type":"timestamp","required":true,"description":"この承認フローの有効開始日時"},{"name":"有効終了日","type":"timestamp","required":false,"description":"この承認フローの有効終了日時"},{"name":"備考","type":"text","required":false,"description":"承認フローに関する備考"},{"name":"作成者ID","type":"uuid","required":true,"description":"承認フローを作成したユーザーID"},{"name":"作成日時","type":"timestamp","required":true,"description":"承認フロー定義の作成日時"},{"name":"更新者ID","type":"uuid","required":false,"description":"承認フローを最後に更新したユーザーID"},{"name":"更新日時","type":"timestamp","required":false,"description":"承認フロー定義の最終更新日時"}]},{"tableName":"承認ステップ","purpose":"申請書類の承認フローにおける各承認段階を管理し、承認者・承認順序・承認状態を追跡する","columns":[{"name":"承認ステップID","type":"uuid","required":true,"description":"承認ステップの一意識別子"},{"name":"申請書類ID","type":"uuid","required":true,"description":"対象申請書類への外部キー"},{"name":"承認フロー定義ID","type":"uuid","required":true,"description":"適用される承認フロー定義への外部キー"},{"name":"ステップ番号","type":"integer","required":true,"description":"承認フロー内での順序番号"},{"name":"承認者ID","type":"uuid","required":true,"description":"承認者ユーザーへの外部キー"},{"name":"承認状態","type":"varchar(100)","required":true,"description":"未承認/承認済/否認/保留/スキップ等の状態"},{"name":"承認日時","type":"timestamp","required":false,"description":"承認・否認が実行された日時"},{"name":"承認コメント","type":"text","required":false,"description":"承認者が入力したコメント・理由"},{"name":"期限日時","type":"timestamp","required":false,"description":"承認期限日時"},{"name":"通知送信日時","type":"timestamp","required":false,"description":"承認依頼通知を送信した日時"},{"name":"代理承認者ID","type":"uuid","required":false,"description":"代理で承認を行ったユーザーID"},{"name":"必須フラグ","type":"boolean","required":true,"description":"このステップが必須かスキップ可能か"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"}]},{"tableName":"承認履歴","purpose":"申請書類の承認プロセスにおける各ステップでの承認・却下・差戻し等の履歴を記録し、承認状況の追跡と監査証跡を提供する","columns":[{"name":"承認履歴ID","type":"uuid","required":true,"description":"承認履歴の一意識別子（主キー）"},{"name":"申請書類ID","type":"uuid","required":true,"description":"対象となる申請書類への外部キー"},{"name":"承認ステップID","type":"uuid","required":true,"description":"承認フローの該当ステップへの外部キー"},{"name":"承認者ID","type":"uuid","required":true,"description":"承認・却下・差戻しを実行したユーザーへの外部キー"},{"name":"承認結果","type":"varchar(100)","required":true,"description":"承認・却下・差戻し・保留等の処理結果"},{"name":"承認コメント","type":"text","required":false,"description":"承認者が入力したコメントや理由"},{"name":"承認日時","type":"timestamp","required":true,"description":"承認処理が実行された日時"},{"name":"次承認者ID","type":"uuid","required":false,"description":"次のステップの承認者（承認時のみ設定）"},{"name":"差戻し先ステップID","type":"uuid","required":false,"description":"差戻し時の戻り先ステップ"},{"name":"承認順序","type":"integer","required":true,"description":"同一申請書類内での承認処理の順序番号"},{"name":"代理承認フラグ","type":"boolean","required":true,"description":"代理承認による処理かどうか"},{"name":"元承認者ID","type":"uuid","required":false,"description":"代理承認時の本来の承認者"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"}]},{"tableName":"通知履歴","purpose":"申請承認システムにおける各種通知の送信履歴と配信状況を管理する","columns":[{"name":"通知履歴ID","type":"uuid","required":true,"description":"通知履歴の一意識別子（主キー）"},{"name":"申請書類ID","type":"uuid","required":false,"description":"関連する申請書類のID（外部キー）"},{"name":"承認ステップID","type":"uuid","required":false,"description":"関連する承認ステップのID（外部キー）"},{"name":"通知対象ユーザーID","type":"uuid","required":true,"description":"通知を受信するユーザーのID（外部キー）"},{"name":"通知種別","type":"varchar(100)","required":true,"description":"通知の種類（申請受付、承認依頼、承認完了、差戻し、却下等）"},{"name":"通知タイトル","type":"varchar(100)","required":true,"description":"通知メッセージのタイトル"},{"name":"通知内容","type":"text","required":true,"description":"通知メッセージの本文"},{"name":"送信方法","type":"varchar(100)","required":true,"description":"通知の送信方法（システム内通知、メール、SMS等）"},{"name":"送信先アドレス","type":"varchar(100)","required":false,"description":"メールアドレスや電話番号等の送信先情報"},{"name":"送信状態","type":"varchar(100)","required":true,"description":"送信状態（送信待ち、送信中、送信完了、送信失敗）"},{"name":"送信日時","type":"timestamp","required":false,"description":"実際に通知が送信された日時"},{"name":"既読フラグ","type":"boolean","required":true,"description":"受信者が通知を既読したかどうか"},{"name":"既読日時","type":"timestamp","required":false,"description":"受信者が通知を既読した日時"},{"name":"エラーメッセージ","type":"text","required":false,"description":"送信失敗時のエラー内容"},{"name":"再送回数","type":"integer","required":true,"description":"通知の再送信回数"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"}]},{"tableName":"処理ルート","purpose":"申請書類の処理経路と現在の処理状況を管理し、承認フローの進行状況を追跡する","columns":[{"name":"処理ルートID","type":"uuid","required":true,"description":"処理ルートの一意識別子（主キー）"},{"name":"申請書類ID","type":"uuid","required":true,"description":"対象となる申請書類への外部キー"},{"name":"承認フロー定義ID","type":"uuid","required":true,"description":"適用される承認フロー定義への外部キー"},{"name":"現在ステップ番号","type":"integer","required":true,"description":"現在処理中の承認ステップ番号"},{"name":"現在承認者ID","type":"uuid","required":false,"description":"現在の承認担当者のユーザーID"},{"name":"処理状況","type":"varchar(100)","required":true,"description":"処理の現在状況（申請中/承認待ち/承認済み/差戻し/却下/取下げ）"},{"name":"開始日時","type":"timestamp","required":true,"description":"処理ルートの開始日時"},{"name":"完了日時","type":"timestamp","required":false,"description":"処理ルートの完了日時"},{"name":"期限日時","type":"timestamp","required":false,"description":"処理完了の期限日時"},{"name":"優先度","type":"integer","required":true,"description":"処理の優先度（1:低 2:通常 3:高 4:緊急）"},{"name":"自動処理フラグ","type":"boolean","required":true,"description":"自動処理対象かどうかのフラグ"},{"name":"備考","type":"text","required":false,"description":"処理ルートに関する備考・メモ"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"},{"name":"更新者ID","type":"uuid","required":true,"description":"レコード最終更新者のユーザーID"}]},{"tableName":"遅延検知設定","purpose":"申請承認プロセスにおける遅延を検知するための設定を管理し、承認ステップごとの期限や通知タイミングを定義する","columns":[{"name":"遅延検知設定ID","type":"uuid","required":true,"description":"遅延検知設定の一意識別子（主キー）"},{"name":"文書種別ID","type":"uuid","required":true,"description":"文書種別マスタへの外部キー"},{"name":"承認ステップID","type":"uuid","required":false,"description":"承認ステップへの外部キー（全ステップ共通の場合はNULL）"},{"name":"設定名","type":"varchar(100)","required":true,"description":"遅延検知設定の名称"},{"name":"期限日数","type":"integer","required":true,"description":"承認期限までの日数"},{"name":"警告日数","type":"integer","required":false,"description":"期限前の警告通知を行う日数"},{"name":"エスカレーション日数","type":"integer","required":false,"description":"期限超過後のエスカレーション通知を行う日数"},{"name":"営業日計算フラグ","type":"boolean","required":true,"description":"営業日ベースで計算するかどうか"},{"name":"有効フラグ","type":"boolean","required":true,"description":"設定が有効かどうか"},{"name":"備考","type":"text","required":false,"description":"設定に関する補足説明"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"},{"name":"更新者ID","type":"uuid","required":true,"description":"レコード最終更新者のユーザーID"}]},{"tableName":"補助金関連度マスタ","purpose":"申請書類と補助金制度の関連度を管理し、適切な承認フローや処理ルートの決定に使用するマスタテーブル","columns":[{"name":"補助金関連度ID","type":"uuid","required":true,"description":"補助金関連度の一意識別子（主キー）"},{"name":"補助金関連度コード","type":"varchar(100)","required":true,"description":"補助金関連度の業務コード（表示・検索用）"},{"name":"補助金関連度名","type":"varchar(100)","required":true,"description":"補助金関連度の名称"},{"name":"関連度レベル","type":"integer","required":true,"description":"関連度の数値レベル（1:低、2:中、3:高など）"},{"name":"説明","type":"text","required":false,"description":"補助金関連度の詳細説明"},{"name":"表示順","type":"integer","required":true,"description":"画面表示時の並び順"},{"name":"有効フラグ","type":"boolean","required":true,"description":"マスタデータの有効/無効状態"},{"name":"作成日時","type":"timestamp","required":true,"description":"レコード作成日時"},{"name":"作成者ID","type":"uuid","required":true,"description":"レコード作成者のユーザーID"},{"name":"更新日時","type":"timestamp","required":true,"description":"レコード最終更新日時"},{"name":"更新者ID","type":"uuid","required":true,"description":"レコード最終更新者のユーザーID"}]}];
 window.AIVIC_PRESET_SEED = {};
 window.AIVIC_PAGE_SCREEN_ID = "scr-1779422339280";
-window.AIVIC_PAGE_INIT_JS = "js\nfunction(container, apiUrl, tables) {\n  // 業務ロジックのインポート\n  const { \n    classifyDocumentTypeAndRoute, \n    determineDocumentTypeAndRoute, \n    handleDocumentClassificationException,\n    validateApplicationInput \n  } = window.businessLogic?.['it-1-br-2-1-1'] || {};\n\n  let currentFile = null;\n  let processLogs = [];\n  let classificationResult = null;\n\n  // 処理ログ再描画関数\n  function renderLogs(logs) {\n    const tbody = container.querySelector(\"#log-tbody\");\n    if (tbody) {\n      tbody.innerHTML = logs.map(log => `\n        <tr>\n          <td>${log.executedAt || \"\"}</td>\n          <td>${log.fileName || \"\"}</td>\n          <td>${log.processType || \"\"}</td>\n          <td>${log.classificationResult || \"\"}</td>\n          <td>${log.accuracy || \"\"}</td>\n          <td>${log.processingTime || \"\"}</td>\n          <td>${log.message || \"\"}</td>\n        </tr>\n      `).join(\"\");\n    }\n  }\n\n  // エラー表示関数\n  function showError(message) {\n    const errorEl = container.querySelector(\"#error-message\") || container.querySelector('[data-testid=\"error-message\"]');\n    if (errorEl) {\n      errorEl.textContent = message;\n      errorEl.style.display = \"block\";\n      setTimeout(() => {\n        errorEl.style.display = \"none\";\n      }, 5000);\n    }\n    if (window.aivicNotify) {\n      window.aivicNotify.error(message);\n    }\n  }\n\n  // 成功メッセージ表示\n  function showSuccess(message) {\n    if (window.aivicNotify) {\n      window.aivicNotify.success(message);\n    }\n  }\n\n  // ファイルアップロード処理\n  function handleFileUpload(file) {\n    if (!file) return;\n\n    // ファイル形式チェック\n    const allowedTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];\n    const fileExt = '.' + file.name.split('.').pop().toLowerCase();\n    if (!allowedTypes.includes(fileExt)) {\n      showError(\"対応していないファイル形式です。PDF、Word、Excelファイルのみアップロード可能です。\");\n      return;\n    }\n\n    // ファイルサイズチェック（50MB制限）\n    const maxSize = 50 * 1024 * 1024;\n    if (file.size > maxSize) {\n      showError(\"ファイルサイズが制限を超えています。50MB以下のファイルを選択してください。\");\n      return;\n    }\n\n    currentFile = file;\n    \n    // ファイル情報表示\n    const fileInfo = container.querySelector(\"#file-info\");\n    const uploadText = container.querySelector(\"#upload-text\");\n    if (fileInfo) {\n      fileInfo.innerHTML = `\n        <div style=\"font-weight: 500;\">${file.name}</div>\n        <div style=\"font-size: 11px; color: var(--text-muted);\">${(file.size / 1024 / 1024).toFixed(2)} MB</div>\n      `;\n      fileInfo.style.display = \"block\";\n    }\n    if (uploadText) {\n      uploadText.style.display = \"none\";\n    }\n\n    // プレビュー表示\n    updateDocumentPreview(file);\n\n    // 自動判別実行\n    executeClassification();\n  }\n\n  // 文書プレビュー更新\n  function updateDocumentPreview(file) {\n    const preview = container.querySelector(\"#document-preview\") || container.querySelector('[data-testid=\"document-preview\"]');\n    if (preview) {\n      if (file.type === 'application/pdf') {\n        preview.innerHTML = `\n          <div style=\"text-align: center; cursor: pointer;\">\n            <div style=\"font-size: 48px; margin-bottom: 8px;\">📄</div>\n            <div style=\"color: var(--text);\">${file.name}</div>\n            <div style=\"font-size: 11px; color: var(--text-muted);\">PDFファイル</div>\n          </div>\n        `;\n      } else {\n        preview.innerHTML = `\n          <div style=\"text-align: center; cursor: pointer;\">\n            <div style=\"font-size: 48px; margin-bottom: 8px;\">📄</div>\n            <div style=\"color: var(--text);\">${file.name}</div>\n            <div style=\"font-size: 11px; color: var(--text-muted);\">文書ファイル</div>\n          </div>\n        `;\n      }\n      preview.style.display = \"block\";\n    }\n  }\n\n  // 文書種別判別実行\n  function executeClassification() {\n    if (!currentFile) {\n      showError(\"ファイルが選択されていません。\");\n      return;\n    }\n\n    const startTime = Date.now();\n    \n    try {\n      // 業務ロジックを使用した文書種別判別\n      const fileReader = new FileReader();\n      fileReader.onload = function(e) {\n        const fileContent = e.target.result;\n        \n        // 模擬的なOCRテキスト抽出\n        const mockOcrText = generateMockOcrText(currentFile.name);\n        \n        // 業務ロジック呼び出し\n        let result;\n        if (classifyDocumentTypeAndRoute) {\n          result = classifyDocumentTypeAndRoute({\n            fileName: currentFile.name,\n            fileContent: mockOcrText,\n            fileSize: currentFile.size,\n            fileType: currentFile.type\n          });\n        } else {\n          // フォールバック処理\n          result = performMockClassification(currentFile.name, mockOcrText);\n        }\n\n        classificationResult = result;\n        \n        // 結果表示\n        displayClassificationResult(result, mockOcrText, Date.now() - startTime);\n        \n        // ログ追加\n        const logEntry = {\n          executedAt: new Date().toLocaleString(),\n          fileName: currentFile.name,\n          processType: \"自動判別\",\n          classificationResult: result.documentType,\n          accuracy: `${(result.confidence * 100).toFixed(1)}%`,\n          processingTime: `${Date.now() - startTime}ms`,\n          message: \"正常終了\"\n        };\n        processLogs.unshift(logEntry);\n        renderLogs(processLogs);\n        \n        showSuccess(\"文書種別判別が完了しました。\");\n      };\n      \n      fileReader.readAsText(currentFile);\n      \n    } catch (error) {\n      console.error(\"Classification error:\", error);\n      \n      // エラー処理\n      if (handleDocumentClassificationException) {\n        const errorResult = handleDocumentClassificationException({\n          error: error.message,\n          fileName: currentFile.name\n        });\n        showError(errorResult.message || \"文書種別判別でエラーが発生しました。\");\n      } else {\n        showError(\"文書種別判別でエラーが発生しました。\");\n      }\n    }\n  }\n\n  // 模擬OCRテキスト生成\n  function generateMockOcrText(fileName) {\n    const lowerName = fileName.toLowerCase();\n    if (lowerName.includes('申請') || lowerName.includes('application')) {\n      return \"申請書\\n申請者: 田中太郎\\n申請日: 2024年1月15日\\n件名: 経費申請について\";\n    } else if (lowerName.includes('契約') || lowerName.includes('contract')) {\n      return \"契約書\\n契約者: 株式会社サンプル\\n契約日: 2024年1月15日\\n件名: システム開発契約\";\n    } else if (lowerName.includes('報告') || lowerName.includes('report')) {\n      return \"報告書\\n報告者: 佐藤花子\\n報告日: 2024年1月15日\\n件名: 月次業務報告\";\n    }\n    return \"文書内容\\n作成者: 不明\\n作成日: 2024年1月15日\\n件名: 一般文書\";\n  }\n\n  // 模擬分類処理\n  function performMockClassification(fileName, ocrText) {\n    const lowerName = fileName.toLowerCase();\n    const lowerText = ocrText.toLowerCase();\n    \n    if (lowerName.includes('申請') || lowerText.includes('申請')) {\n      return { documentType: \"申請書\", confidence: 0.92, keywords: [\"申請\", \"承認\", \"申請者\"] };\n    } else if (lowerName.includes('契約') || lowerText.includes('契約')) {\n      return { documentType: \"契約書\", confidence: 0.88, keywords: [\"契約\", \"契約者\", \"契約日\"] };\n    } else if (lowerName.includes('報告') || lowerText.includes('報告')) {\n      return { documentType: \"報告書\", confidence: 0.85, keywords: [\"報告\", \"報告者\", \"報告日\"] };\n    }\n    return { documentType: \"その他\", confidence: 0.60, keywords: [\"文書\", \"作成\"] };\n  }\n\n  // 判別結果表示\n  function displayClassificationResult(result, ocrText, processingTime) {\n    // 自動判別結果表示\n    const autoClassification = container.querySelector(\"#auto-classification\");\n    if (autoClassification) {\n      autoClassification.textContent = result.documentType;\n      autoClassification.style.display = \"block\";\n    }\n\n    // 信頼度スコア表示\n    const confidenceScore = container.querySelector(\"#confidence-score\") || container.querySelector('[data-testid=\"confidence-score\"]');\n    if (confidenceScore) {\n      confidenceScore.textContent = `${(result.confidence * 100).toFixed(1)}%`;\n      confidenceScore.style.display = \"block\";\n    }\n\n    // OCR結果表示\n    const ocrResults = container.querySelector('[data-testid=\"ocr-results\"]');\n    if (ocrResults) {\n      ocrResults.innerHTML = `\n        <div style=\"background: #f5f5f5; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 12px;\">\n          ${ocrText.replace(/\\n/g, '<br>')}\n        </div>\n      `;\n      ocrResults.style.display = \"block\";\n    }\n\n    // 承認フロー表示\n    displayApprovalFlow(result.documentType);\n  }\n\n  // 承認フロー表示\n  function displayApprovalFlow(documentType) {\n    const approvalFlow = container.querySelector('[data-testid=\"approval-flow\"]');\n    const approvalSteps = container.querySelector('[data-testid=\"approval-steps\"]');\n    \n    if (approvalFlow) {\n      approvalFlow.style.display = \"block\";\n    }\n    \n    if (approvalSteps) {\n      let steps = [];\n      switch (documentType) {\n        case \"申請書\":\n          steps = [\"課長承認\", \"部長承認\", \"役員承認\"];\n          break;\n        case \"契約書\":\n          steps = [\"法務確認\", \"部長承認\", \"役員承認\", \"社長承認\"];\n          break;\n        case \"報告書\":\n          steps = [\"課長確認\", \"部長確認\"];\n          break;\n        default:\n          steps = [\"課長確認\"];\n      }\n      \n      approvalSteps.innerHTML = steps.map((step, index) => `\n        <div style=\"display: flex; align-items: center; margin-bottom: 8px;\">\n          <div style=\"width: 24px; height: 24px; border-radius: 50%; background: #e3f2fd; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 12px; font-weight: 600;\">\n            ${index + 1}\n          </div>\n          <div>${step}</div>\n        </div>\n      `).join(\"\");\n      approvalSteps.style.display = \"block\";\n    }\n  }\n\n  // 手動選択処理\n  function handleManualClassification() {\n    const manualSelect = container.querySelector(\"#manual-classification\");\n    if (manualSelect && manualSelect.value && classificationResult) {\n      classificationResult.documentType = manualSelect.value;\n      classificationResult.confidence = 1.0; // 手動選択は100%\n      \n      // 表示更新\n      const autoClassification = container.querySelector(\"#auto-classification\");\n      if (autoClassification) {\n        autoClassification.textContent = manualSelect.value;\n      }\n      \n      const confidenceScore = container.querySelector(\"#confidence-score\") || container.querySelector('[data-testid=\"confidence-score\"]');\n      if (confidenceScore) {\n        confidenceScore.textContent = \"100.0%\";\n      }\n      \n      // 承認フロー更新\n      displayApprovalFlow(manualSelect.value);\n      \n      showSuccess(\"文書種別を手動で設定しました。\");\n    }\n  }\n\n  // 判別結果確定処理\n  function confirmClassification() {\n    if (!classificationResult) {\n      showError(\"判別結果がありません。先に文書をアップロードして判別を実行してください。\");\n      return;\n    }\n\n    try {\n      // 結果をセッションストレージに保存\n      const resultData = {\n        fileName: currentFile.name,\n        documentType: classificationResult.documentType,\n        confidence: classificationResult.confidence,\n        timestamp: new Date().toISOString()\n      };\n      \n      sessionStorage.setItem('classificationResult', JSON.stringify(resultData));\n      \n      showSuccess(\"判別結果を確定しました。\");\n      \n      // 次画面への遷移\n      setTimeout(() => {\n        if (window.showScreen) {\n          window.showScreen('scr-1779422207222'); // 申請書類登録画面へ\n        }\n      }, 1000);\n      \n    } catch (error) {\n      console.error(\"Confirmation error:\", error);\n      showError(\"判別結果の確定でエラーが発生しました。\");\n    }\n  }\n\n  // 再判別処理\n  function reExecuteClassification() {\n    if (currentFile) {\n      executeClassification();\n    } else {\n      showError(\"再判別するファイルがありません。\");\n    }\n  }\n\n  // イベントハンドラー設定\n  function setupEventHandlers() {\n    // ファイル入力\n    const fileInput = container.querySelector(\"#file-input\");\n    if (fileInput) {\n      fileInput.addEventListener(\"change\", (e) => {\n        if (e.target.files && e.target.files[0]) {\n          handleFileUpload(e.target.files[0]);\n        }\n      });\n    }\n\n    // 判別実行ボタン\n    const executeBtn = container.querySelector('button:has-text(\"判別実行\")') || \n                      Array.from(container.querySelectorAll('button')).find(btn => btn.textContent.includes('判別実行'));\n    if (executeBtn) {\n      executeBtn.addEventListener(\"click\", executeClassification);\n    }\n\n    // 判別結果確定ボタン\n    const confirmBtn = container.querySelector('button:has-text(\"判別結果確定\")') || \n                       Array.from(container.querySelectorAll('button')).find(btn => btn.textContent.includes('判別結果確定'));\n    if (confirmBtn) {\n      confirmBtn.addEventListener(\"click\", confirmClassification);\n    }\n\n    // 手動分類選択\n    const manualSelect = container.querySelector(\"#manual-classification\");\n    if (manualSelect) {\n      manualSelect.addEventListener(\"change\", handleManualClassification);\n    }\n\n    // 再判別ボタン\n    const reExecuteBtn = Array.from(container.querySelectorAll('button')).find(btn => btn.textContent.includes('再判別'));\n    if (reExecuteBtn) {\n      reExecuteBtn.addEventListener(\"click\", reExecuteClassification);\n    }\n\n    // プレビュークリック\n    const preview = container.querySelector(\"#document-preview\") || container.querySelector('[data-testid=\"document-preview\"]');\n    if (preview) {\n      preview.addEventListener(\"click\", () => {\n        if (currentFile) {\n          // プレビュー表示の切り替え\n          preview.style.transform = preview.style.transform === 'scale(1.1)' ? 'scale(1)' : 'scale(1.1)';\n        }\n      });\n    }\n  }\n\n  // 初期化\n  function initialize() {\n    setupEventHandlers();\n    renderLogs(processLogs);\n    \n    // エラーメッセージ要素の初期化\n    const errorEl = container.querySelector(\"#error-message\") || container.querySelector('[data-testid=\"error-message\"]');\n    if (errorEl) {\n      errorEl.style.display = \"none\";\n    }\n  }\n\n  // 初期化実行\n  initialize();\n\n  // 外部から参照可能な関数をwindowオブジェクトに追加\n  window.documentClassification = {\n    executeClassification,\n    confirmClassification,\n    reExecuteClassification\n  };\n}";
+window.AIVIC_PAGE_INIT_JS = "function(container, apiUrl, tables) {\n  let currentFileData = null;\n  let currentAnalysisResult = null;\n\n  // ログ再描画関数\n  function renderLogs(logs) {\n    const tbody = container.querySelector(\"#log-tbody\");\n    if (!logs || logs.length === 0) {\n      tbody.innerHTML = '<tr><td colspan=\"4\" style=\"padding: 6px 10px; font-size: 12px; color: var(--text-muted);\">処理ログはありません</td></tr>';\n      return;\n    }\n    tbody.innerHTML = logs.map(log => `\n      <tr>\n        <td style=\"padding: 6px 10px; font-size: 12px; color: var(--text);\">${log.実行日時 || \"\"}</td>\n        <td style=\"padding: 6px 10px; font-size: 12px; color: var(--text);\">${log.処理内容 || \"\"}</td>\n        <td style=\"padding: 6px 10px; font-size: 12px; color: var(--text);\">${log.結果 || \"\"}</td>\n        <td style=\"padding: 6px 10px; font-size: 12px; color: var(--text);\">${log.詳細 || \"\"}</td>\n      </tr>\n    `).join(\"\");\n  }\n\n  // エラー表示関数\n  function showError(message) {\n    const errorEl = container.querySelector(\"#error-message\");\n    errorEl.textContent = message;\n    errorEl.style.display = \"block\";\n    setTimeout(() => {\n      errorEl.style.display = \"none\";\n    }, 5000);\n  }\n\n  // ファイル情報表示\n  function displayFileInfo(file) {\n    const fileInfoEl = container.querySelector(\"#file-info\");\n    const fileNameEl = container.querySelector(\"#file-name\");\n    fileNameEl.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;\n    fileInfoEl.style.display = \"block\";\n  }\n\n  // 文書種別判別処理\n  async function analyzeDocument(file) {\n    try {\n      // ファイル形式チェック\n      const allowedTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];\n      const fileExt = '.' + file.name.split('.').pop().toLowerCase();\n      if (!allowedTypes.includes(fileExt)) {\n        showError(\"対応していないファイル形式です。PDF、Word、Excelファイルをアップロードしてください。\");\n        return;\n      }\n\n      // ファイルサイズチェック（50MB制限）\n      if (file.size > 50 * 1024 * 1024) {\n        showError(\"ファイルサイズが制限を超えています。50MB以下のファイルをアップロードしてください。\");\n        return;\n      }\n\n      // 模擬的な解析処理\n      await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機\n\n      // 模擬的な判別結果\n      const documentTypes = ['申請書', '報告書', '契約書', '稟議書', '請求書', '見積書'];\n      const randomType = documentTypes[Math.floor(Math.random() * documentTypes.length)];\n      const accuracy = Math.floor(Math.random() * 40) + 60; // 60-99%\n\n      // 結果表示\n      container.querySelector(\"#detected-type\").textContent = randomType;\n      container.querySelector(\"#accuracy-score\").textContent = `${accuracy}%`;\n\n      // 補助金関連度\n      const subsidyLevels = ['低', '中', '高'];\n      const subsidyLevel = subsidyLevels[Math.floor(Math.random() * subsidyLevels.length)];\n      const subsidyConfidence = Math.floor(Math.random() * 30) + 70;\n      container.querySelector(\"#subsidy-level\").textContent = subsidyLevel;\n      container.querySelector(\"#subsidy-confidence\").textContent = `${subsidyConfidence}%`;\n\n      // OCR結果\n      const sampleOcrText = `文書種別: ${randomType}\\n作成日: 2024年1月15日\\n申請者: 山田太郎\\n内容: ${randomType}に関する申請内容です。\\n金額: 100,000円\\n承認者: 佐藤次郎`;\n      container.querySelector(\"#ocr-result\").textContent = sampleOcrText;\n\n      // キーワード抽出\n      const keywords = ['申請', '承認', '金額', '期限', '部署', '責任者'];\n      const keywordsHtml = keywords.map(kw => \n        `<span style=\"display: inline-block; padding: 2px 6px; margin: 2px; background: var(--primary); color: #fff; border-radius: 3px; font-size: 11px;\">${kw}</span>`\n      ).join('');\n      container.querySelector(\"#keywords-container\").innerHTML = keywordsHtml;\n\n      // 承認フロー設定\n      container.querySelector(\"#approval-steps\").textContent = \"3段階\";\n      container.querySelector(\"#current-approver\").textContent = \"佐藤次郎\";\n      container.querySelector(\"#process-status\").textContent = \"承認待ち\";\n\n      // プレビュー表示\n      container.querySelector(\"#document-preview\").innerHTML = `\n        <div style=\"text-align: center;\">\n          <div style=\"font-size: 14px; color: var(--text); margin-bottom: 8px;\">${file.name}</div>\n          <div style=\"font-size: 12px; color: var(--text-muted);\">種別: ${randomType}</div>\n          <div style=\"font-size: 12px; color: var(--text-muted);\">精度: ${accuracy}%</div>\n        </div>\n      `;\n\n      currentAnalysisResult = {\n        documentType: randomType,\n        accuracy: accuracy,\n        subsidyLevel: subsidyLevel,\n        subsidyConfidence: subsidyConfidence,\n        ocrText: sampleOcrText,\n        keywords: keywords\n      };\n\n      // ログ追加\n      addProcessLog(\"文書種別判別\", \"成功\", `${randomType} (精度: ${accuracy}%)`);\n\n    } catch (error) {\n      showError(\"文書種別判別処理中にエラーが発生しました。\");\n      addProcessLog(\"文書種別判別\", \"失敗\", error.message);\n    }\n  }\n\n  // 処理ログ追加\n  function addProcessLog(process, result, detail) {\n    const now = new Date().toLocaleString('ja-JP');\n    const logData = {\n      実行日時: now,\n      処理内容: process,\n      結果: result,\n      詳細: detail\n    };\n\n    // 既存ログを取得して新しいログを追加\n    window.aivicApi.list(0).then(logs => {\n      const updatedLogs = [logData, ...(logs || [])];\n      renderLogs(updatedLogs.slice(0, 10)); // 最新10件のみ表示\n    });\n  }\n\n  // ファイル選択処理\n  const fileInput = container.querySelector(\"#file-input\");\n  const uploadArea = container.querySelector(\"#upload-area\");\n\n  fileInput.addEventListener(\"change\", (e) => {\n    const file = e.target.files[0];\n    if (file) {\n      currentFileData = file;\n      displayFileInfo(file);\n      analyzeDocument(file);\n    }\n  });\n\n  // ドラッグ&ドロップ処理\n  uploadArea.addEventListener(\"dragover\", (e) => {\n    e.preventDefault();\n    uploadArea.style.borderColor = \"var(--primary)\";\n  });\n\n  uploadArea.addEventListener(\"dragleave\", (e) => {\n    e.preventDefault();\n    uploadArea.style.borderColor = \"rgba(255,255,255,0.18)\";\n  });\n\n  uploadArea.addEventListener(\"drop\", (e) => {\n    e.preventDefault();\n    uploadArea.style.borderColor = \"rgba(255,255,255,0.18)\";\n    const file = e.dataTransfer.files[0];\n    if (file) {\n      currentFileData = file;\n      fileInput.files = e.dataTransfer.files;\n      displayFileInfo(file);\n      analyzeDocument(file);\n    }\n  });\n\n  // 手動種別選択\n  container.querySelector(\"#manual-type\").addEventListener(\"change\", (e) => {\n    if (e.target.value) {\n      container.querySelector(\"#detected-type\").textContent = e.target.value;\n      addProcessLog(\"手動種別選択\", \"成功\", `${e.target.value}に変更`);\n    }\n  });\n\n  // 再判別実行\n  container.querySelector(\"#btn-reanalyze\").addEventListener(\"click\", () => {\n    if (!currentFileData) {\n      showError(\"ファイルが選択されていません。\");\n      return;\n    }\n    if (confirm(\"再判別処理を実行しますか？\")) {\n      analyzeDocument(currentFileData);\n    }\n  });\n\n  // 判別結果確定\n  container.querySelector(\"#btn-confirm\").addEventListener(\"click\", () => {\n    if (!currentAnalysisResult) {\n      showError(\"判別結果がありません。ファイルをアップロードして判別処理を実行してください。\");\n      return;\n    }\n\n    const documentType = container.querySelector(\"#detected-type\").textContent;\n    if (documentType === \"未判別\") {\n      showError(\"文書種別が判別されていません。\");\n      return;\n    }\n\n    addProcessLog(\"判別結果確定\", \"成功\", `文書種別: ${documentType}`);\n    \n    // 次画面へ遷移（申請書類登録画面）\n    setTimeout(() => {\n      window.showScreen('scr-1779422207222');\n    }, 1000);\n  });\n\n  // 初期ログ表示\n  window.aivicApi.list(0).then(logs => {\n    renderLogs(logs || []);\n  });\n}";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </script>
-  <style>
-    :root {
-      --primary: #ff6b9d;
-      --primary-hover: #ff4d8a;
-      --primary-light: #fff0f5;
-      --bg-main: #fafafa;
-      --bg-card: #ffffff;
-      --bg-sidebar: #f8f9fa;
-      --border: #e8e8e8;
-      --border-light: #f0f0f0;
-      --text: #2d2d2d;
-      --text-muted: #666666;
-      --text-light: #888888;
-      --top-bar-bg: #ffffff;
-      --top-bar-border: #f0f0f0;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --info: #3b82f6;
-    }
+    </script>
+    <style>
+        :root {
+            --primary: #ff6b9d;
+            --primary-hover: #e55a8a;
+            --bg-main: #2c2c2c;
+            --bg-card: #383838;
+            --bg-sidebar: #333333;
+            --border: #4a4a4a;
+            --text: #f0f0f0;
+            --text-muted: #b8b8b8;
+            --top-bar-bg: #363636;
+            --top-bar-border: #4d4d4d;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+        }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.4;
-      color: var(--text);
-      background: var(--bg-main);
-      overflow-x: hidden;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-main);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+        }
 
-    .app-container {
-      display: flex;
-      height: 100vh;
-    }
+        .app-layout {
+            display: flex;
+            height: 100vh;
+        }
 
-    /* サイドバー */
-    .sidebar {
-      width: 220px;
-      background: var(--bg-sidebar);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
+        .sidebar {
+            width: 220px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
 
-    .sidebar-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border-light);
-      background: var(--top-bar-bg);
-    }
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--top-bar-bg);
+        }
 
-    .logo {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .logo {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--primary);
+        }
 
-    .logo-icon {
-      width: 24px;
-      height: 24px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 12px;
-      font-weight: 600;
-    }
+        .nav-section {
+            padding: 8px 0;
+        }
 
-    .nav-section {
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border-light);
-    }
+        .nav-section-title {
+            padding: 8px 16px 6px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-    .nav-section:last-child {
-      border-bottom: none;
-      flex: 1;
-    }
+        .nav-item {
+            display: block;
+            padding: 8px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
 
-    .nav-section-title {
-      padding: 6px 16px;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+        .nav-item:hover {
+            background: rgba(255, 107, 157, 0.08);
+            color: var(--text);
+        }
 
-    .nav-item {
-      display: block;
-      padding: 8px 16px;
-      color: var(--text);
-      text-decoration: none;
-      font-size: 12px;
-      font-weight: 400;
-      border: none;
-      background: none;
-      width: 100%;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      border-left: 3px solid transparent;
-    }
+        .nav-item.aivic-active {
+            background: rgba(255, 107, 157, 0.12);
+            color: var(--primary);
+            font-weight: 500;
+        }
 
-    .nav-item:hover {
-      background: rgba(255, 107, 157, 0.08);
-      color: var(--primary);
-    }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-    .nav-item.aivic-active {
-      background: var(--primary-light);
-      color: var(--primary);
-      font-weight: 500;
-      border-left-color: var(--primary);
-    }
+        .top-bar {
+            height: 52px;
+            background: var(--top-bar-bg);
+            border-bottom: 1px solid var(--top-bar-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            flex-shrink: 0;
+        }
 
-    .nav-item-icon {
-      display: inline-block;
-      width: 16px;
-      margin-right: 8px;
-      text-align: center;
-      font-size: 11px;
-    }
+        .breadcrumb {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+        }
 
-    /* メインコンテンツ */
-    .main-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
 
-    .top-bar {
-      height: 52px;
-      background: var(--top-bar-bg);
-      border-bottom: 1px solid var(--top-bar-border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      flex-shrink: 0;
-    }
+        .notification-badge {
+            position: relative;
+            padding: 6px;
+            border-radius: 6px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
 
-    .breadcrumb {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
+        .notification-badge::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+        }
 
-    .breadcrumb-current {
-      font-weight: 500;
-      color: var(--text);
-    }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
 
-    .top-bar-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
 
-    .notification-badge {
-      position: relative;
-      padding: 6px;
-      border-radius: 6px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+        .logout-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 12px;
+        }
 
-    .notification-badge:hover {
-      background: var(--bg-main);
-    }
+        .logout-link:hover {
+            color: var(--text);
+        }
 
-    .notification-count {
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      background: var(--primary);
-      color: white;
-      font-size: 10px;
-      font-weight: 500;
-      padding: 2px 5px;
-      border-radius: 8px;
-      min-width: 16px;
-      text-align: center;
-      line-height: 1.2;
-    }
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
 
-    .user-menu {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+        .panel-container {
+            max-width: 100%;
+        }
 
-    .user-menu:hover {
-      background: var(--bg-main);
-    }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
 
-    .user-avatar {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 10px;
-      font-weight: 600;
-    }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
 
-    .user-name {
-      font-size: 12px;
-      font-weight: 500;
-    }
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            margin-bottom: 12px;
+        }
 
-    .logout-link {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: all 0.15s ease;
-    }
+        .stat-title {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
 
-    .logout-link:hover {
-      background: var(--bg-main);
-      color: var(--text);
-    }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
 
-    .content-area {
-      flex: 1;
-      overflow: auto;
-      padding: 16px 20px;
-    }
+        .stat-change {
+            font-size: 11px;
+            font-weight: 500;
+        }
 
-    /* パネルコンテナ */
-    [data-aivic-panel] {
-      display: none;
-    }
+        .stat-change.positive {
+            color: var(--success);
+        }
 
-    [data-aivic-panel].active {
-      display: block;
-    }
+        .stat-change.negative {
+            color: var(--danger);
+        }
 
-    /* ステータスインジケーター */
-    .status-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
+        .content-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
 
-    .status-pending {
-      background: #fef3c7;
-      color: #92400e;
-    }
+        .card-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-    .status-approved {
-      background: #d1fae5;
-      color: #065f46;
-    }
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
 
-    .status-rejected {
-      background: #fee2e2;
-      color: #991b1b;
-    }
+        .card-body {
+            padding: 16px;
+        }
 
-    .status-processing {
-      background: #dbeafe;
-      color: #1e40af;
-    }
+        .table-container {
+            overflow-x: auto;
+        }
 
-    /* レスポンシブ */
-    @media (max-width: 768px) {
-      .sidebar {
-        width: 200px;
-      }
-      
-      .content-area {
-        padding: 12px 16px;
-      }
-      
-      .top-bar {
-        padding: 0 16px;
-      }
-    }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-    @media (max-width: 640px) {
-      .sidebar {
-        position: fixed;
-        left: -220px;
-        z-index: 1000;
-        transition: left 0.3s ease;
-      }
-      
-      .sidebar.mobile-open {
-        left: 0;
-      }
-      
-      .main-content {
-        margin-left: 0;
-      }
-    }
-  </style>
+        .data-table th {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--warning);
+        }
+
+        .status-approved {
+            background: rgba(74, 222, 128, 0.15);
+            color: var(--success);
+        }
+
+        .status-rejected {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--danger);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-main);
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .filter-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+            
+            .content-area {
+                padding: 12px 16px;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="app-container">
-    <!-- サイドバー -->
-    <nav class="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <div class="logo-icon">H</div>
-          <span>申請承認システム</span>
-        </div>
-      </div>
+    <div class="app-layout">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">申請承認システム</div>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">申請管理</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422326698" onclick="showScreen('scr-1779422326698')">申請書類作成</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422207222" onclick="showScreen('scr-1779422207222')">書類登録・判別</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422434952" onclick="showScreen('scr-1779422434952')">申請書類確認</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422606208" onclick="showScreen('scr-1779422606208')">電子文書検索</button>
+            </div>
 
-      <div class="nav-section">
-        <div class="nav-section-title">申請管理</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422326698" onclick="showScreen('scr-1779422326698')">
-          <span class="nav-item-icon">📝</span>申請書類作成
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422207222" onclick="showScreen('scr-1779422207222')">
-          <span class="nav-item-icon">📤</span>書類登録・自動判別
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422434952" onclick="showScreen('scr-1779422434952')">
-          <span class="nav-item-icon">👁</span>申請書類確認
-        </button>
-      </div>
+            <div class="nav-section">
+                <div class="nav-section-title">承認処理</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422407913" onclick="showScreen('scr-1779422407913')">承認案件通知</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422254479" onclick="showScreen('scr-1779422254479')">承認処理</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422452973" onclick="showScreen('scr-1779422452973')">承認判断入力</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422470870" onclick="showScreen('scr-1779422470870')">結果通知処理</button>
+            </div>
 
-      <div class="nav-section">
-        <div class="nav-section-title">承認処理</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422407913" onclick="showScreen('scr-1779422407913')">
-          <span class="nav-item-icon">🔔</span>承認案件通知
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422254479" onclick="showScreen('scr-1779422254479')">
-          <span class="nav-item-icon">✅</span>承認処理
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422452973" onclick="showScreen('scr-1779422452973')">
-          <span class="nav-item-icon">📋</span>承認判断入力
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422470870" onclick="showScreen('scr-1779422470870')">
-          <span class="nav-item-icon">📨</span>結果通知処理
-        </button>
-      </div>
+            <div class="nav-section">
+                <div class="nav-section-title">進捗・監視</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422241190" onclick="showScreen('scr-1779422241190')">承認フロー進捗</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422369173" onclick="showScreen('scr-1779422369173')">進捗確認</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422271790" onclick="showScreen('scr-1779422271790')">遅延案件検知</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422380305" onclick="showScreen('scr-1779422380305')">滞留案件検索</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422392638" onclick="showScreen('scr-1779422392638')">催促通知送信</button>
+            </div>
 
-      <div class="nav-section">
-        <div class="nav-section-title">進捗・監視</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422369173" onclick="showScreen('scr-1779422369173')">
-          <span class="nav-item-icon">📊</span>進捗確認
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422241190" onclick="showScreen('scr-1779422241190')">
-          <span class="nav-item-icon">🎯</span>承認フロー進捗管理
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422271790" onclick="showScreen('scr-1779422271790')">
-          <span class="nav-item-icon">⚠️</span>遅延案件検知・催促
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422380305" onclick="showScreen('scr-1779422380305')">
-          <span class="nav-item-icon">🔍</span>滞留案件検索
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422392638" onclick="showScreen('scr-1779422392638')">
-          <span class="nav-item-icon">📢</span>催促通知送信
-        </button>
-      </div>
+            <div class="nav-section">
+                <div class="nav-section-title">履歴・監査</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422306272" onclick="showScreen('scr-1779422306272')">承認・通知履歴</button>
+            </div>
 
-      <div class="nav-section">
-        <div class="nav-section-title">ルート・フロー管理</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422354662" onclick="showScreen('scr-1779422354662')">
-          <span class="nav-item-icon">🔄</span>承認ルート設定
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422591281" onclick="showScreen('scr-1779422591281')">
-          <span class="nav-item-icon">🛤️</span>処理ルート設定
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422283293" onclick="showScreen('scr-1779422283293')">
-          <span class="nav-item-icon">🔀</span>処理ルート変更・通知
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422546501" onclick="showScreen('scr-1779422546501')">
-          <span class="nav-item-icon">🔧</span>処理ルート更新
-        </button>
-      </div>
+            <div class="nav-section">
+                <div class="nav-section-title">ルート管理</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422283293" onclick="showScreen('scr-1779422283293')">処理ルート変更</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422354662" onclick="showScreen('scr-1779422354662')">承認ルート設定</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422591281" onclick="showScreen('scr-1779422591281')">処理ルート設定</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422546501" onclick="showScreen('scr-1779422546501')">処理ルート更新</button>
+            </div>
 
-      <div class="nav-section">
-        <div class="nav-section-title">文書分類・判定</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422339280" onclick="showScreen('scr-1779422339280')">
-          <span class="nav-item-icon">🤖</span>文書種別判別処理
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422563059" onclick="showScreen('scr-1779422563059')">
-          <span class="nav-item-icon">📑</span>文書種別判定
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422575885" onclick="showScreen('scr-1779422575885')">
-          <span class="nav-item-icon">💻</span>電子化可否判定
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422527556" onclick="showScreen('scr-1779422527556')">
-          <span class="nav-item-icon">⚙️</span>分類基準設定
-        </button>
-      </div>
+            <div class="nav-section">
+                <div class="nav-section-title">自動判定・設定</div>
+                <button class="nav-item" data-aivic-nav="scr-1779422339280" onclick="showScreen('scr-1779422339280')">文書種別判別</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422563059" onclick="showScreen('scr-1779422563059')">文書種別判定</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422575885" onclick="showScreen('scr-1779422575885')">電子化可否判定</button>
+                <button class="nav-item" data-aivic-nav="scr-1779422527556" onclick="showScreen('scr-1779422527556')">分類基準設定</button>
+            </div>
+        </nav>
 
-      <div class="nav-section">
-        <div class="nav-section-title">履歴・検索</div>
-        <button class="nav-item" data-aivic-nav="scr-1779422306272" onclick="showScreen('scr-1779422306272')">
-          <span class="nav-item-icon">📜</span>承認履歴・通知履歴
-        </button>
-        <button class="nav-item" data-aivic-nav="scr-1779422606208" onclick="showScreen('scr-1779422606208')">
-          <span class="nav-item-icon">🔎</span>電子文書検索
-        </button>
-      </div>
-    </nav>
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="breadcrumb">ハイブリッド申請承認システム</div>
+                <div class="user-menu">
+                    <div class="notification-badge">🔔</div>
+                    <div class="user-info">
+                        <div class="user-avatar">U</div>
+                        <span>管理者</span>
+                        <a href="./login.html" class="logout-link">ログアウト</a>
+                    </div>
+                </div>
+            </header>
 
-    <!-- メインコンテンツ -->
-    <main class="main-content">
-      <header class="top-bar">
-        <div class="breadcrumb">
-          <span class="breadcrumb-current" id="current-screen-title">ダッシュボード</span>
-        </div>
-        <div class="top-bar-actions">
-          <div class="notification-badge">
-            <span>🔔</span>
-            <div class="notification-count">3</div>
-          </div>
-          <div class="user-menu">
-            <div class="user-avatar">管</div>
-            <span class="user-name">管理者</span>
-          </div>
-          <a href="./login.html" class="logout-link">ログアウト</a>
-        </div>
-      </header>
-
-      <div class="content-area">
-        <!-- 各画面のパネルコンテナ -->
-        <div data-aivic-panel="scr-1779422207222" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422241190" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422254479" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422271790" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422283293" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422306272" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422326698" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422339280"><div class="document-classification-screen">
+            <div class="content-area">
+                <div data-aivic-panel="scr-1779422207222" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422241190" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422254479" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422271790" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422283293" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422306272" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422326698" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422339280" style="display:block"><div class="document-classification-screen">
   <!-- ヘッダー -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <h1 style="font-size: 18px; font-weight: 600; color: var(--text); margin: 0;">文書種別判別処理</h1>
+    <h2 style="font-size: 18px; font-weight: 600; color: var(--text); margin: 0;">文書種別判別処理</h2>
     <div style="display: flex; gap: 8px;">
-      <button class="action-btn secondary" data-testid="back-button" onclick="window.showScreen('scr-1779422207222')">申請書類登録へ</button>
-      <button class="action-btn secondary" data-testid="flow-button" onclick="window.showScreen('scr-1779422241190')">承認フロー管理へ</button>
+      <button class="action-btn secondary" data-testid="back-button" onclick="window.showScreen('scr-1779422207222')">申請書類登録へ戻る</button>
+      <button class="action-btn secondary" data-testid="approval-flow-button" onclick="window.showScreen('scr-1779422241190')">承認フロー管理</button>
     </div>
   </div>
 
   <!-- メインコンテンツ -->
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-    <!-- 左側: ファイルアップロード・判別結果 -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">ファイルアップロード・判別</h2>
-      
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <!-- 左カラム -->
+    <div>
       <!-- ファイルアップロード -->
-      <div style="margin-bottom: 16px;">
-        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">アップロードファイル</label>
-        <div id="upload-area" style="border: 2px dashed rgba(255,255,255,0.18); border-radius: 6px; padding: 20px; text-align: center; background: rgba(0,0,0,0.25); cursor: pointer;">
+      <div class="card" style="margin-bottom: 16px; padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">文書アップロード</h3>
+        <div id="upload-area" style="border: 2px dashed rgba(255,255,255,0.18); border-radius: 6px; padding: 24px; text-align: center; background: rgba(0,0,0,0.15); cursor: pointer;">
+          <div style="color: var(--text-muted); font-size: 13px; margin-bottom: 8px;">ファイルをドラッグ&ドロップまたはクリックして選択</div>
           <input type="file" id="file-input" data-testid="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display: none;">
-          <div id="upload-text" style="color: var(--text-muted); font-size: 13px;">
-            ファイルをドラッグ&ドロップまたはクリックして選択
+          <button class="action-btn" data-testid="file-select-button" onclick="document.getElementById('file-input').click()">ファイル選択</button>
+        </div>
+        <div id="file-info" style="margin-top: 12px; display: none;">
+          <div style="font-size: 12px; color: var(--text-muted);">選択ファイル:</div>
+          <div id="file-name" style="font-size: 13px; color: var(--text); margin-top: 4px;"></div>
+        </div>
+      </div>
+
+      <!-- 判別結果 -->
+      <div class="card" style="margin-bottom: 16px; padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">判別結果</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">文書種別</label>
+            <div id="detected-type" data-testid="detected-type" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">未判別</div>
           </div>
-          <div id="file-info" style="display: none; color: var(--text); font-size: 13px;"></div>
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">判別精度</label>
+            <div id="accuracy-score" data-testid="accuracy-score" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">--%</div>
+          </div>
+        </div>
+        <div style="margin-top: 12px;">
+          <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">手動選択</label>
+          <select id="manual-type" data-testid="manual-type-select" style="width: 100%; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.25); color: var(--text); font-size: 13px;">
+            <option value="">選択してください</option>
+            <option value="申請書">申請書</option>
+            <option value="報告書">報告書</option>
+            <option value="契約書">契約書</option>
+            <option value="稟議書">稟議書</option>
+            <option value="請求書">請求書</option>
+            <option value="見積書">見積書</option>
+          </select>
         </div>
       </div>
 
-      <!-- 文書種別判別結果 -->
-      <div style="margin-bottom: 16px;">
-        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">自動判別結果</label>
-        <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
-          <input type="text" id="auto-classification" data-testid="auto-classification" readonly style="padding: 6px 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.25); color: var(--text); font-size: 13px;">
-          <div id="confidence-score" data-testid="confidence-score" style="font-size: 13px; color: var(--text); font-weight: 500; min-width: 60px;">-</div>
+      <!-- 補助金関連度 -->
+      <div class="card" style="padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">補助金関連度判定</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">関連度レベル</label>
+            <div id="subsidy-level" data-testid="subsidy-level" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">未判定</div>
+          </div>
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">信頼度</label>
+            <div id="subsidy-confidence" data-testid="subsidy-confidence" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">--%</div>
+          </div>
         </div>
-      </div>
-
-      <!-- 手動選択 -->
-      <div style="margin-bottom: 16px;">
-        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">文書種別手動選択</label>
-        <select id="manual-classification" data-testid="manual-classification" style="padding: 6px 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.25); color: var(--text); font-size: 13px; width: 100%;">
-          <option value="">選択してください</option>
-          <option value="申請書">申請書</option>
-          <option value="報告書">報告書</option>
-          <option value="契約書">契約書</option>
-          <option value="稟議書">稟議書</option>
-          <option value="見積書">見積書</option>
-          <option value="請求書">請求書</option>
-        </select>
-      </div>
-
-      <!-- 実行ボタン -->
-      <div style="display: flex; gap: 8px;">
-        <button id="btn-classify" data-testid="classify-button" class="action-btn" style="flex: 1;">判別実行</button>
-        <button id="btn-reclassify" data-testid="reclassify-button" class="action-btn secondary">再判別</button>
       </div>
     </div>
 
-    <!-- 右側: プレビュー -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">文書プレビュー</h2>
-      <div id="document-preview" data-testid="document-preview" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.25); height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px;">
-        ファイルを選択してください
+    <!-- 右カラム -->
+    <div>
+      <!-- 文書プレビュー -->
+      <div class="card" style="margin-bottom: 16px; padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">文書プレビュー</h3>
+        <div id="document-preview" data-testid="document-preview" style="height: 200px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px;">
+          ファイルを選択してください
+        </div>
+      </div>
+
+      <!-- OCR解析結果 -->
+      <div class="card" style="margin-bottom: 16px; padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">OCR解析結果</h3>
+        <div id="ocr-result" data-testid="ocr-result" style="height: 120px; padding: 8px; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.15); overflow-y: auto; font-size: 12px; color: var(--text); white-space: pre-wrap;">
+          OCR解析を実行してください
+        </div>
+      </div>
+
+      <!-- キーワード抽出結果 -->
+      <div class="card" style="padding: 14px;">
+        <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">キーワード抽出結果</h3>
+        <div id="keywords-container" data-testid="keywords-container" style="min-height: 60px;">
+          <div style="color: var(--text-muted); font-size: 13px;">キーワード抽出を実行してください</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- OCR・キーワード解析結果 -->
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-    <!-- OCR解析結果 -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">OCR解析結果</h2>
-      <div id="ocr-results" data-testid="ocr-results" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.25); padding: 10px; height: 150px; overflow-y: auto; font-size: 12px; color: var(--text); line-height: 1.4;">
-        OCR解析を実行してください
+  <!-- 承認フロー設定 -->
+  <div class="card" style="margin-top: 16px; padding: 14px;">
+    <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">承認フロー自動設定</h3>
+    <div id="approval-flow-info" data-testid="approval-flow-info" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">承認段数</label>
+        <div id="approval-steps" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">未設定</div>
       </div>
-    </div>
-
-    <!-- キーワード抽出結果 -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">キーワード抽出結果</h2>
-      <div id="keywords-list" data-testid="keywords-list" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 150px; align-content: flex-start;">
-        <!-- キーワードバッジがここに表示される -->
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">現在承認者</label>
+        <div id="current-approver" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">未設定</div>
       </div>
-    </div>
-  </div>
-
-  <!-- 補助金関連度・承認フロー -->
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-    <!-- 補助金関連度 -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">補助金関連度判定</h2>
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="flex: 1;">
-          <div id="subsidy-relevance" data-testid="subsidy-relevance" style="font-size: 16px; font-weight: 600; color: var(--text);">-</div>
-          <div style="font-size: 11px; color: var(--text-muted);">関連度レベル</div>
-        </div>
-        <div style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center;">
-          <span id="relevance-percentage" data-testid="relevance-percentage" style="font-size: 14px; font-weight: 600; color: var(--text);">-%</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 承認フロー自動設定 -->
-    <div class="card" style="padding: 14px;">
-      <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">承認フロー自動設定</h2>
-      <div id="approval-flow" data-testid="approval-flow" style="font-size: 13px; color: var(--text);">
-        <div style="margin-bottom: 8px;">
-          <span style="color: var(--text-muted);">承認段数:</span>
-          <span id="approval-steps" data-testid="approval-steps">-</span>
-        </div>
-        <div style="margin-bottom: 8px;">
-          <span style="color: var(--text-muted);">承認者:</span>
-          <span id="approvers" data-testid="approvers">-</span>
-        </div>
-        <div>
-          <span style="color: var(--text-muted);">フロー名:</span>
-          <span id="flow-name" data-testid="flow-name">-</span>
-        </div>
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block;">処理状況</label>
+        <div id="process-status" style="padding: 6px 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 13px; color: var(--text);">未開始</div>
       </div>
     </div>
   </div>
 
   <!-- 処理ログ -->
-  <div class="card" style="padding: 14px; margin-bottom: 16px;">
-    <h2 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">処理ログ</h2>
-    <div class="table-wrap">
+  <div class="card" style="margin-top: 16px; padding: 14px;">
+    <h3 style="font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 12px 0;">処理ログ</h3>
+    <div class="table-wrap" style="max-height: 200px; overflow-y: auto;">
       <table data-testid="process-log-table">
         <thead>
           <tr>
-            <th style="width: 140px;">実行日時</th>
-            <th style="width: 200px;">ファイル名</th>
-            <th style="width: 120px;">処理種別</th>
-            <th style="width: 120px;">判別結果</th>
-            <th style="width: 80px;">精度</th>
-            <th style="width: 100px;">処理時間</th>
-            <th>メッセージ</th>
+            <th style="padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text);">実行日時</th>
+            <th style="padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text);">処理内容</th>
+            <th style="padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text);">結果</th>
+            <th style="padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text);">詳細</th>
           </tr>
         </thead>
         <tbody id="log-tbody">
-          <!-- ログデータがここに表示される -->
+          <tr>
+            <td style="padding: 6px 10px; font-size: 12px; color: var(--text-muted);" colspan="4">処理ログはありません</td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <!-- アクションボタン -->
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <div style="display: flex; gap: 8px;">
-      <button id="btn-confirm" data-testid="confirm-button" class="action-btn">判別結果確定</button>
-      <button id="btn-clear" data-testid="clear-button" class="action-btn secondary">クリア</button>
-    </div>
-    <div style="display: flex; gap: 8px;">
-      <button class="action-btn secondary" data-testid="settings-button" onclick="window.showScreen('scr-1779422527556')">分類基準設定</button>
-      <button class="action-btn secondary" data-testid="route-settings-button" onclick="window.showScreen('scr-1779422591281')">処理ルート設定</button>
-    </div>
+  <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+    <button class="action-btn secondary" data-testid="re-analyze-button" id="btn-reanalyze">再判別実行</button>
+    <button class="action-btn" data-testid="confirm-button" id="btn-confirm">判別結果確定</button>
   </div>
 
   <!-- エラーメッセージ -->
-  <div id="error-message" data-testid="error-message" style="display: none; background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 6px; padding: 12px; margin-top: 16px; color: var(--text); font-size: 13px;"></div>
+  <div id="error-message" data-testid="error-message" style="display: none; margin-top: 12px; padding: 10px; background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 6px; color: #fca5a5; font-size: 13px;"></div>
 </div></div>
-        <div data-aivic-panel="scr-1779422354662" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422369173" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422380305" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422392638" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422407913" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422434952" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422452973" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422470870" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422527556" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422546501" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422563059" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422575885" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422591281" style="display:none"></div>
-        <div data-aivic-panel="scr-1779422606208" style="display:none"></div>
-      </div>
-    </main>
-  </div>
+                <div data-aivic-panel="scr-1779422354662" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422369173" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422380305" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422392638" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422407913" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422434952" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422452973" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422470870" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422527556" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422546501" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422563059" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422575885" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422591281" style="display:none"></div>
+                <div data-aivic-panel="scr-1779422606208" style="display:none"></div>
+            </div>
+        </main>
+    </div>
 
-  <script>
-    // 画面タイトル更新
-    const screenTitles = {
-      'scr-1779422207222': '申請書類登録・自動判別',
-      'scr-1779422241190': '承認フロー進捗管理',
-      'scr-1779422254479': '承認処理',
-      'scr-1779422271790': '遅延案件検知・催促通知',
-      'scr-1779422283293': '処理ルート変更・通知',
-      'scr-1779422306272': '承認履歴・通知履歴照会',
-      'scr-1779422326698': '申請書類作成',
-      'scr-1779422339280': '文書種別判別処理',
-      'scr-1779422354662': '承認ルート設定',
-      'scr-1779422369173': '進捗確認',
-      'scr-1779422380305': '滞留案件検索処理',
-      'scr-1779422392638': '催促通知送信処理',
-      'scr-1779422407913': '承認案件通知',
-      'scr-1779422434952': '申請書類確認',
-      'scr-1779422452973': '承認判断入力',
-      'scr-1779422470870': '結果通知処理',
-      'scr-1779422527556': '分類基準設定',
-      'scr-1779422546501': '処理ルート更新処理',
-      'scr-1779422563059': '文書種別判定',
-      'scr-1779422575885': '電子化可否判定',
-      'scr-1779422591281': '処理ルート設定',
-      'scr-1779422606208': '電子文書検索'
-    };
-
-    // 画面切り替え時にタイトルを更新
-    const originalShowScreen = window.showScreen;
-    window.showScreen = function(screenId) {
-      if (originalShowScreen) {
-        originalShowScreen(screenId);
-      }
-      const titleElement = document.getElementById('current-screen-title');
-      if (titleElement && screenTitles[screenId]) {
-        titleElement.textContent = screenTitles[screenId];
-      }
-    };
-
-    // モバイル用サイドバートグル
-    function toggleMobileSidebar() {
-      const sidebar = document.querySelector('.sidebar');
-      sidebar.classList.toggle('mobile-open');
-    }
-  </script>
-
-  <script>
+    <script>
 (function() {
   var TABLE_DEFS = window.AIVIC_TABLES || [];
   var PRESET_SEED = window.AIVIC_PRESET_SEED || {};
