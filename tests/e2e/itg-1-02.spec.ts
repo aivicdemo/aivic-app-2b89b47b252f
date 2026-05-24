@@ -12,7 +12,8 @@ test.describe("申請書類登録・自動判別画面", () => {
     await page.goto("/panels/scr-1779422207222.html");
   });
 
-  test('SCEN-016: PDF文書アップロードで自動判別成功', async ({ page }) => {
+  // SCEN-016
+  test("[normal] PDF文書アップロードで自動判別成功", async ({ page }) => {
     await page.setInputFiles('[data-testid="file-input"]', {
       name: 'test-application.pdf',
       mimeType: 'application/pdf',
@@ -20,66 +21,65 @@ test.describe("申請書類登録・自動判別画面", () => {
     });
     
     await page.click('[data-testid="register-button"]');
-    await page.waitForSelector('[data-testid="detection-result"]', { state: 'visible' });
     
-    await expect(page.locator('[data-testid="detection-result"]')).toBeVisible();
-    await expect(page.locator('[data-testid="document-type-select"]')).toBeVisible();
+    await expect(page.locator('#detection-result')).toBeVisible();
+    await expect(page.locator('#detected-type')).not.toBeEmpty();
   });
 
-  test('SCEN-017: ドラッグ&ドロップでファイルアップロード', async ({ page }) => {
-    const fileContent = Buffer.from('PDF test content');
+  // SCEN-017
+  test("[normal] ドラッグ&ドロップでファイルアップロード", async ({ page }) => {
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.locator('[data-testid="upload-area"]').dragTo(page.locator('[data-testid="upload-area"]'));
     
-    await page.setInputFiles('[data-testid="file-input"]', {
-      name: 'drag-drop-test.pdf',
-      mimeType: 'application/pdf',
-      buffer: fileContent
-    });
-
-    await expect(page.locator('[data-testid="uploaded-files-list"]')).toBeVisible();
-    await expect(page.locator('[data-testid="detection-result"]')).toBeVisible();
-  });
-
-  test('SCEN-018: 手動で文書種別を変更して申請', async ({ page }) => {
-    await page.setInputFiles('[data-testid="file-input"]', {
-      name: 'manual-change-test.pdf',
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: 'test-document.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from('PDF content')
     });
 
-    await page.waitForSelector('[data-testid="document-type-select"]', { state: 'visible' });
-    await page.selectOption('[data-testid="document-type-select"]', '経費申請');
-    
-    await page.fill('[data-testid="application-title"]', '経費申請書類テスト');
-    await page.fill('[data-testid="application-description"]', 'システムテスト用の経費申請書類です。テスト内容を詳しく記載します。');
-    
-    await page.click('[data-testid="register-button"]');
-    await expect(page.locator('[data-testid="detection-result"]')).toContainText('経費申請');
+    await expect(page.locator('#uploaded-files')).toContainText('test-document.pdf');
+    await expect(page.locator('#detection-result')).toBeVisible();
   });
 
-  test('SCEN-019: 緊急度設定で承認フロー変更', async ({ page }) => {
-    await page.fill('[data-testid="application-title"]', '緊急承認フローテスト申請');
-    await page.fill('[data-testid="application-description"]', 'テスト用の申請内容です。緊急度による承認フローの変更をテストします。');
-    
-    await page.check('[data-testid="urgency-urgent"]');
+  // SCEN-018
+  test("[normal] 手動で文書種別を変更して申請", async ({ page }) => {
+    await page.setInputFiles('[data-testid="file-input"]', {
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('PDF content')
+    });
+
+    await page.click('[data-testid="auto-detect-button"]');
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請書');
+    await page.fill('[data-testid="application-title"]', '経費申請書のテスト');
     await page.click('[data-testid="register-button"]');
-    
-    await expect(page.locator('[data-testid="approval-flow"]')).toBeVisible();
+
+    await expect(page.locator('#detection-result')).toContainText('経費申請書');
   });
 
-  test('SCEN-020: 申請タイトルと説明を入力して登録', async ({ page }) => {
-    const testTitle = "申請書類登録テスト";
-    const testDescription = "システムテスト用の申請書類説明文です。詳細な内容を記載します。";
+  // SCEN-019
+  test("[normal] 緊急度設定で承認フロー変更", async ({ page }) => {
+    await page.fill('[data-testid="application-title"]', '緊急承認テスト申請');
+    await page.fill('[data-testid="application-description"]', '緊急度設定による承認フロー変更のテスト申請書類です。緊急処理が必要な内容を含みます。');
     
-    await page.fill('[data-testid="application-title"]', testTitle);
-    await page.fill('[data-testid="application-description"]', testDescription);
-    
+    await page.click('[data-testid="urgency-urgent"]');
     await page.click('[data-testid="register-button"]');
-    
-    await expect(page.locator('[data-testid="application-title"]')).toHaveValue(testTitle);
-    await expect(page.locator('[data-testid="application-description"]')).toHaveValue(testDescription);
+
+    await expect(page.locator('#approval-flow-name')).toContainText('緊急');
   });
 
-  test('SCEN-021: 非対応ファイル形式でエラー表示', async ({ page }) => {
+  // SCEN-020
+  test("[normal] 申請タイトルと説明を入力して登録", async ({ page }) => {
+    await page.fill('[data-testid="application-title"]', '有効なタイトルテスト');
+    await page.fill('[data-testid="application-description"]', 'これは申請の詳細な説明文です。必要な情報をすべて含んでいます。');
+    await page.click('[data-testid="register-button"]');
+
+    await expect(page.locator('#detection-result')).toBeVisible();
+  });
+
+  // SCEN-021
+  test("[error] 非対応ファイル形式でエラー表示", async ({ page }) => {
     await page.setInputFiles('[data-testid="file-input"]', {
       name: 'invalid-file.txt',
       mimeType: 'text/plain',
@@ -87,9 +87,11 @@ test.describe("申請書類登録・自動判別画面", () => {
     });
 
     await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('対応していないファイル形式');
   });
 
-  test('SCEN-022: ファイルサイズ上限超過でエラー', async ({ page }) => {
+  // SCEN-022
+  test("[error] ファイルサイズ上限超過でエラー", async ({ page }) => {
     const largeBuffer = Buffer.alloc(50 * 1024 * 1024);
     
     await page.setInputFiles('[data-testid="file-input"]', {
@@ -99,44 +101,50 @@ test.describe("申請書類登録・自動判別画面", () => {
     });
 
     await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('ファイルサイズ');
   });
 
-  test('SCEN-023: 文書種別判別失敗時の手動選択', async ({ page }) => {
+  // SCEN-023
+  test("[error] 文書種別判別失敗時の手動選択", async ({ page }) => {
     await page.setInputFiles('[data-testid="file-input"]', {
       name: 'unclear-document.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('Unclear document content')
+      buffer: Buffer.from('Unclear content')
     });
 
-    await page.waitForSelector('[data-testid="document-type-select"]', { state: 'visible' });
-    await page.selectOption('[data-testid="document-type-select"]', '休暇申請');
+    await page.click('[data-testid="auto-detect-button"]');
+    await expect(page.locator('[data-testid="document-type-select"]')).toBeVisible();
     
+    await page.selectOption('[data-testid="document-type-select"]', '休暇申請書');
     await page.click('[data-testid="register-button"]');
-    await expect(page.locator('[data-testid="detection-result"]')).toBeVisible();
+
+    await expect(page.locator('#detected-type')).toContainText('休暇申請書');
   });
 
-  test('SCEN-024: 申請タイトル未入力でバリデーション', async ({ page }) => {
-    await page.fill('[data-testid="application-description"]', 'テスト用の申請内容です。タイトルが未入力の場合のバリデーションテストです。');
-    
-    await page.setInputFiles('[data-testid="file-input"]', {
-      name: 'validation-test.pdf',
-      mimeType: 'application/pdf',
-      buffer: Buffer.from('PDF content')
-    });
+  // SCEN-024
+  test("[error] 申請タイトル未入力でバリデーション", async ({ page }) => {
+    await page.selectOption('[data-testid="document-type-select"]', '経費申請書');
+    await page.fill('[data-testid="application-description"]', '申請内容の説明です。十分な文字数で記載されています。');
     
     await page.click('[data-testid="register-button"]');
+
     await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('申請タイトル');
   });
 
-  test('SCEN-025: 承認者不在でエラー表示', async ({ page }) => {
+  // SCEN-025
+  test("[error] 承認者不在でエラー表示", async ({ page }) => {
     await page.fill('[data-testid="application-title"]', '承認者不在テスト申請');
-    await page.fill('[data-testid="application-description"]', '承認者が不在状態での申請テストです。エラー表示を確認します。');
+    await page.fill('[data-testid="application-description"]', '承認者が不在状態での申請テストです。');
     
     await page.click('[data-testid="register-button"]');
+
     await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+    await expect(page.locator('[data-testid="error-message"]')).toContainText('承認者不在');
   });
 
-  test('SCEN-026: 最大ファイルサイズでアップロード', async ({ page }) => {
+  // SCEN-026
+  test("[edge] 最大ファイルサイズでアップロード", async ({ page }) => {
     const maxSizeBuffer = Buffer.alloc(10 * 1024 * 1024);
     
     await page.setInputFiles('[data-testid="file-input"]', {
@@ -145,55 +153,67 @@ test.describe("申請書類登録・自動判別画面", () => {
       buffer: maxSizeBuffer
     });
 
-    await expect(page.locator('[data-testid="uploaded-files-list"]')).toBeVisible();
-    await expect(page.locator('[data-testid="detection-result"]')).toBeVisible();
+    await page.click('[data-testid="register-button"]');
+
+    await expect(page.locator('#uploaded-files')).toContainText('max-size-file.pdf');
+    await expect(page.locator('#detection-result')).toBeVisible();
   });
 
-  test('SCEN-027: 申請タイトル文字数上限', async ({ page }) => {
-    const maxLengthTitle = 'あ'.repeat(200);
-    const overLimitTitle = 'あ'.repeat(201);
+  // SCEN-027
+  test("[edge] 申請タイトル文字数上限", async ({ page }) => {
+    const maxTitle = 'A'.repeat(200);
+    const overMaxTitle = 'A'.repeat(201);
     
-    await page.fill('[data-testid="application-title"]', maxLengthTitle);
-    await expect(page.locator('[data-testid="application-title"]')).toHaveValue(maxLengthTitle);
+    await page.fill('[data-testid="application-title"]', maxTitle);
+    await expect(page.locator('[data-testid="application-title"]')).toHaveValue(maxTitle);
     
-    await page.fill('[data-testid="application-title"]', overLimitTitle);
+    await page.fill('[data-testid="application-title"]', overMaxTitle);
     const actualValue = await page.locator('[data-testid="application-title"]').inputValue();
     expect(actualValue.length).toBeLessThanOrEqual(200);
   });
 
-  test('SCEN-028: 申請説明最大文字数入力', async ({ page }) => {
-    const maxDescription = 'テ'.repeat(2000);
-    const overLimitDescription = 'テ'.repeat(2001);
+  // SCEN-028
+  test("[edge] 申請説明最大文字数入力", async ({ page }) => {
+    const maxDescription = 'A'.repeat(2000);
+    const overMaxDescription = 'A'.repeat(2001);
     
     await page.fill('[data-testid="application-description"]', maxDescription);
     await expect(page.locator('[data-testid="application-description"]')).toHaveValue(maxDescription);
     
-    await page.fill('[data-testid="application-description"]', overLimitDescription);
+    await page.fill('[data-testid="application-description"]', overMaxDescription);
     const actualValue = await page.locator('[data-testid="application-description"]').inputValue();
     expect(actualValue.length).toBeLessThanOrEqual(2000);
   });
 
-  test('SCEN-029: 判別信頼度低下時の警告表示', async ({ page }) => {
+  // SCEN-029
+  test("[edge] 判別信頼度低下時の警告表示", async ({ page }) => {
     await page.setInputFiles('[data-testid="file-input"]', {
-      name: 'low-confidence.pdf',
+      name: 'unclear-quality.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('Low quality document content')
+      buffer: Buffer.from('Low quality content')
     });
 
-    await page.waitForSelector('[data-testid="detection-result"]', { state: 'visible' });
-    await expect(page.locator('#low-confidence-warning')).toBeVisible();
+    await page.click('[data-testid="auto-detect-button"]');
+
+    await expect(page.locator('#confidence-warning')).toBeVisible();
+    await expect(page.locator('#confidence-text')).toContainText('0%');
   });
 
-  test('SCEN-030: 複数ファイル同時アップロード', async ({ page }) => {
+  // SCEN-030
+  test("[edge] 複数ファイル同時アップロード", async ({ page }) => {
     const files = [
-      { name: 'file1.pdf', mimeType: 'application/pdf', buffer: Buffer.from('PDF content 1') },
-      { name: 'file2.pdf', mimeType: 'application/pdf', buffer: Buffer.from('PDF content 2') },
-      { name: 'file3.pdf', mimeType: 'application/pdf', buffer: Buffer.from('PDF content 3') }
+      { name: 'file1.pdf', mimeType: 'application/pdf', buffer: Buffer.from('PDF1') },
+      { name: 'file2.pdf', mimeType: 'application/pdf', buffer: Buffer.from('PDF2') },
+      { name: 'file3.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('JPEG') }
     ];
 
     await page.setInputFiles('[data-testid="file-input"]', files);
+
+    await expect(page.locator('#uploaded-files')).toContainText('file1.pdf');
+    await expect(page.locator('#uploaded-files')).toContainText('file2.pdf');
+    await expect(page.locator('#uploaded-files')).toContainText('file3.jpg');
     
-    await expect(page.locator('[data-testid="uploaded-files-list"]')).toBeVisible();
-    await expect(page.locator('[data-testid="detection-result"]')).toBeVisible();
+    await page.click('[data-testid="register-button"]');
+    await expect(page.locator('#detection-result')).toBeVisible();
   });
 });
