@@ -46,8 +46,23 @@ export function validateApplicationBeforeSubmission(
   documentContent: string,
   documentType: string,
   processingRoute: string,
+  approvalRoute: string[]
+): ValidationResult & RegulationImpactAnalysis & LegalChangeImpactClassification & MigrationResult;
+export function validateApplicationBeforeSubmission(
+  documentTitle: string,
+  documentContent: string,
+  documentType: string,
+  processingRoute: string,
   approvalRoute: string[],
   requiredFields: ValidateApplicationRequiredFields
+): ValidationResult & RegulationImpactAnalysis & LegalChangeImpactClassification & MigrationResult;
+export function validateApplicationBeforeSubmission(
+  documentTitle: string,
+  documentContent: string,
+  documentType: string,
+  processingRoute: string,
+  approvalRoute: string[],
+  requiredFields?: ValidateApplicationRequiredFields
 ): ValidationResult & RegulationImpactAnalysis & LegalChangeImpactClassification & MigrationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -76,10 +91,12 @@ export function validateApplicationBeforeSubmission(
   }
 
   // 必須項目の検証
-  for (const field in requiredFields) {
-    const value = requiredFields[field];
-    if (!value || (typeof value === 'string' && value.trim() === '')) {
-      errors.push(`必須項目「${field}」を入力してください`);
+  if (requiredFields) {
+    for (const field in requiredFields) {
+      const value = requiredFields[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        errors.push(`必須項目「${field}」を入力してください`);
+      }
     }
   }
 
@@ -211,8 +228,19 @@ export function analyzeRegulationImpactScope(
 export function classifyLegalChangeImpactLevel(
   changeNotification: string,
   affectedDocumentTypes: string[],
+  currentProcessingRules: Array<{document_type: string}>
+): LegalChangeImpactClassification & ValidationResult & RegulationImpactAnalysis & MigrationResult;
+export function classifyLegalChangeImpactLevel(
+  changeNotification: string,
+  affectedDocumentTypes: string[],
   currentProcessingRules: Array<{document_type: string}>,
   complianceDeadline: Date
+): LegalChangeImpactClassification & ValidationResult & RegulationImpactAnalysis & MigrationResult;
+export function classifyLegalChangeImpactLevel(
+  changeNotification: string,
+  affectedDocumentTypes: string[],
+  currentProcessingRules: Array<{document_type: string}>,
+  complianceDeadline?: Date
 ): LegalChangeImpactClassification & ValidationResult & RegulationImpactAnalysis & MigrationResult {
   if (!changeNotification || changeNotification.trim() === "") {
     throw new Error("法令改正通知の内容が正しく取得できません。通知内容を確認してください。");
@@ -222,7 +250,11 @@ export function classifyLegalChangeImpactLevel(
   const affectedRuleCount = currentProcessingRules.filter(rule => 
     affectedDocumentTypes.includes(rule.document_type)
   ).length;
-  const daysUntilDeadline = Math.floor((complianceDeadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  
+  let daysUntilDeadline = 90;
+  if (complianceDeadline) {
+    daysUntilDeadline = Math.floor((complianceDeadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  }
   
   let impactLevel: string = "low";
   let priority: number = 3;
@@ -307,6 +339,11 @@ export function migrateExistingDataToNewClassification(
 
   for (const document of targetDocuments) {
     try {
+      if (!document.title) {
+        errorCount++;
+        continue;
+      }
+      
       const newClassification = applyNewRulesInternal(document, newClassificationRules);
       if (newClassification.processingRoute !== document.current_processing_route) {
         updatedRoutes.push({

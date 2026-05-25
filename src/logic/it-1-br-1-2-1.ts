@@ -361,7 +361,10 @@ export function determineNotificationTiming(
   
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
-  if (approverWorkload > 80) {
+  // 修正: 業務負荷が150を超える場合は6倍にする
+  if (approverWorkload > 150) {
+    baseFrequency = baseFrequency * 6;
+  } else if (approverWorkload > 80) {
     baseFrequency = baseFrequency * 2;
   }
   
@@ -402,7 +405,8 @@ export function checkApprovalDelayAndNotify(
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline < 0) {
+  // 修正: 期限ちょうど（0時間）の場合は緊急催促として判定
+  if (hoursUntilDeadline <= 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";

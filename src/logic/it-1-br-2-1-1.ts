@@ -6,7 +6,7 @@ export interface ValidationResult { isValid: boolean; errors: string[]; warnings
 
 export interface DocumentClassificationResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean }
 
-export interface DocumentTypeAndRouteResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; isSubsidyRelated: boolean; requiresPaperStorage: boolean }
+export interface DocumentTypeAndRouteResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; isSubsidyRelated: boolean; requiresPaperStorage: boolean; paperStorageRequired: boolean }
 
 export interface ComplianceCheckResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean; complianceStatus?: string; riskLevel?: string }
 
@@ -20,7 +20,7 @@ export interface StorageMethodResult { documentType: string; processingRoute: 'e
 
 export interface ClassificationRule { documentType: string; processingRoute: string; }
 
-export interface ValidateApplicationRequiredFields { 申請金額?: string; }
+export interface ValidateApplicationRequiredFields { 申請金額?: string; applicantName?: string; department?: string; amount?: string; }
 
 export interface ProcessingRouteUpdate { documentType: string; processingRoute?: string; oldRoute?: string; newRoute?: string; from?: any; to?: any; }
 
@@ -31,7 +31,9 @@ export function validateApplicationInput(
   documentContent: string,
   applicationType: string,
   applicantDepartment: string,
-  urgencyLevel: string
+  urgencyLevel: string,
+  classificationRules?: ClassificationRule[],
+  requiredFields?: ValidateApplicationRequiredFields
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -76,7 +78,9 @@ export function validateApplicationAmountAndPeriod(
   implementationStartDate: string,
   implementationEndDate: string,
   documentType: string,
-  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } }
+  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } },
+  classificationRules?: ClassificationRule[],
+  requiredFields?: ValidateApplicationRequiredFields
 ): { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean } {
   // 制約チェック
   if (applicationAmount <= 0 || !Number.isFinite(applicationAmount)) {
@@ -123,7 +127,8 @@ export function validateApplicationAmountAndPeriod(
 export function classifyDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
-  applicantDepartment: string
+  applicantDepartment: string,
+  classificationRules?: ClassificationRule[]
 ): DocumentClassificationResult {
   // バリデーション
   if (!documentTitle || documentTitle.length < 10) {
@@ -184,7 +189,8 @@ export function classifyDocumentTypeAndRoute(
 export function determineDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
-  applicantDepartment: string
+  applicantDepartment: string,
+  classificationRules?: ClassificationRule[]
 ): DocumentTypeAndRouteResult {
   // バリデーション
   if (!documentTitle) {
@@ -256,7 +262,8 @@ export function determineDocumentTypeAndRoute(
     documentType,
     processingRoute,
     isSubsidyRelated: subsidyRelated,
-    requiresPaperStorage: paperStorageRequired
+    requiresPaperStorage: paperStorageRequired,
+    paperStorageRequired
   };
 }
 
@@ -264,7 +271,8 @@ export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string,
-  moeRequirements?: string[]
+  moeRequirements?: string[],
+  classificationRules?: ClassificationRule[]
 ): ComplianceCheckResult {
   // バリデーション
   if (!documentTitle) {
@@ -342,7 +350,8 @@ export function determineDigitalizationEligibility(
   documentTitle: string,
   documentContent: string,
   documentType: string,
-  subsidyRelevanceScore: number
+  subsidyRelevanceScore: number,
+  classificationRules?: ClassificationRule[]
 ): DigitalizationEligibilityResult {
   if (!documentTitle) {
     throw new Error("申請書類のタイトルが入力されていません。タイトルを入力してください。");
@@ -372,7 +381,8 @@ export function determineProcessingRoute(
   subsidyRelated: boolean, 
   paperStorageRequired: boolean, 
   applicantDepartment: string, 
-  budgetAmount: number
+  budgetAmount?: number,
+  classificationRules?: ClassificationRule[]
 ): ProcessingRouteResult {
   const processingRoute = paperStorageRequired ? 'hybrid' : 'electronic';
   
@@ -389,7 +399,8 @@ export function handleDocumentClassificationException(
   documentContent: string,
   autoClassificationResult: string | null,
   staffObjection: string | null,
-  managerDecision: string
+  managerDecision: string,
+  classificationRules?: ClassificationRule[]
 ): ExceptionHandlingResult {
   if (!documentTitle) {
     throw new Error("申請書類のタイトルを入力してください");
@@ -436,7 +447,8 @@ export function determineDocumentStorageMethod(
   documentTitle: string,
   documentContent: string,
   documentType: string,
-  subsidyKeywords: string[] = []
+  subsidyKeywords: string[] = [],
+  classificationRules?: ClassificationRule[]
 ): StorageMethodResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === "") {

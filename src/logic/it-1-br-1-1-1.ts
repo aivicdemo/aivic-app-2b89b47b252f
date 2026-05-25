@@ -5,38 +5,43 @@ export interface ValidationResult {
   canProceed: boolean;
 }
 
+export interface BudgetLimits {
+  [key: string]: number;
+}
+
 export function validateApplicationAmount(
   amount: number,
-  budgetLimit: number,
-  applicationPeriod: string,
-  currentDate: string
+  documentType: string,
+  budgetLimits: BudgetLimits
 ): ValidationResult {
   const errors: string[] = [];
-  let isAmountValid = false;
-  let isPeriodValid = false;
+  let isAmountValid = true;
+  let isPeriodValid = true;
 
-  // 金額チェック
-  if (amount <= budgetLimit) {
-    isAmountValid = true;
-  } else {
-    errors.push('申請金額が予算上限を超えています');
-  }
-
-  // 期間チェック
-  const periodStart = new Date(applicationPeriod.split(' - ')[0]);
-  const periodEnd = new Date(applicationPeriod.split(' - ')[1]);
-  const current = new Date(currentDate);
+  const limit = budgetLimits[documentType];
   
-  if (current >= periodStart && current <= periodEnd) {
-    isPeriodValid = true;
-  } else {
-    errors.push('申請期間外です');
+  if (limit !== undefined) {
+    if (amount > limit * 1.5) {
+      // 大幅超過の場合はエラーを投げる
+      throw new Error("申請金額が大幅に予算上限を超過しています。金額を見直してください");
+    }
+    
+    if (amount > limit) {
+      isAmountValid = false;
+      errors.push("申請金額が予算上限を超過しています");
+    }
+    
+    // 予算上限丁度の場合は有効とする
+    if (amount === limit) {
+      isAmountValid = true;
+      isPeriodValid = true;
+    }
   }
 
   return {
     isAmountValid,
     isPeriodValid,
     validationErrors: errors,
-    canProceed: isAmountValid && isPeriodValid
+    canProceed: isAmountValid && isPeriodValid && errors.length === 0
   };
 }
