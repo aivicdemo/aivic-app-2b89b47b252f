@@ -18,9 +18,18 @@ export interface ExceptionHandlingResult { finalDocumentType: string; processing
 
 export interface StorageMethodResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean }
 
-export interface ClassificationRule { documentType?: string; processingRoute?: string; }
+export interface ClassificationRule { 
+  documentType?: string; 
+  processingRoute?: string;
+  keywords?: string[];
+}
 
-export interface ValidateApplicationRequiredFields { 申請金額?: string; applicantName?: string; department?: string; amount?: string; }
+export interface ValidateApplicationRequiredFields { 
+  申請金額?: string; 
+  applicantName?: string; 
+  department?: string; 
+  amount?: string; 
+}
 
 export interface ProcessingRouteUpdate { documentType: string; processingRoute?: string; oldRoute?: string; newRoute?: string; from?: any; to?: any; }
 
@@ -328,7 +337,7 @@ export function checkMoeComplianceRequirements(
   
   // リスクレベル - 修正: 高い関連度の場合にhighを返すよう調整
   let riskLevel: string;
-  if (adjustedScore >= 0.7) {
+  if (adjustedScore >= 0.8) {
     riskLevel = 'high';
   } else if (adjustedScore >= 0.4) {
     riskLevel = 'medium';
