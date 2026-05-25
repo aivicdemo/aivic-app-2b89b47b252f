@@ -14,6 +14,8 @@ export interface MigrationResult { migratedCount: number; skippedCount: number; 
 
 export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }
 
+export interface ChangeLog { affectedDocuments: string[]; affectedCount: number }
+
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
   documentContent: string,
@@ -204,7 +206,7 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }>,
+  newClassificationRules: ClassificationRule[],
   existingDocuments: Array<{ id: string; document_type?: string; current_processing_route?: string; title?: string; content?: string; documentType?: string }>,
   migrationScope: string
 ): MigrationResult {
@@ -233,7 +235,7 @@ export function migrateExistingDataToNewClassification(
     return true;
   };
 
-  const applyNewRulesInternal = (doc: any, rules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }>): { processingRoute: string } => {
+  const applyNewRulesInternal = (doc: any, rules: ClassificationRule[]): { processingRoute: string } => {
     const docType = doc.document_type || doc.documentType;
     
     for (const rule of rules) {

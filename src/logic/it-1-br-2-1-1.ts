@@ -14,16 +14,30 @@ export interface DigitalizationResult { documentType: string; processingRoute: '
 
 export interface ExceptionHandlingResult { finalDocumentType: string; processingRoute: 'electronic' | 'hybrid'; exceptionReason: string; learningData: object }
 
-export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; from?: string; to?: string }
+export interface ClassificationRule { 
+  documentType: string; 
+  processingRoute: string; 
+  paperStorageRequired?: boolean; 
+  from?: string; 
+  to?: string 
+}
 
-export interface ChangeLog { documentType: string; from: string; to: string; affectedCount?: number }
+export interface ChangeLog { 
+  documentType: string; 
+  from: string; 
+  to: string; 
+  affectedCount?: number;
+  affectedDocuments?: string[]
+}
 
 export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,
   applicationType: string,
   applicantDepartment: string,
-  urgencyLevel: string
+  urgencyLevel?: string,
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -111,7 +125,8 @@ export function classifyDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string,
-  classificationRules?: ClassificationRule[]
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): DocumentClassificationResult {
   // バリデーション
   if (!documentTitle || documentTitle.length < 10) {
@@ -184,6 +199,7 @@ export function determineDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string,
+  classificationRules?: ClassificationRule[],
   changeLog?: ChangeLog
 ): DocumentTypeAndRouteResult {
   // バリデーション
