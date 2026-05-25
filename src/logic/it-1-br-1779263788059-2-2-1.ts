@@ -3,7 +3,10 @@
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate
 
 // 修正内容:
-// 1. determineLegalChangeProcessingPriority: processingOrderの計算を修正（1-5の範囲に制限）
+// 1. updateProcessingRoutesByRegulationChange: 文部科学省通知の場合の通知対象者を修正
+// 2. updateDocumentClassificationStandards: 事業報告書の影響文書数を0から50に修正
+// 3. determineLegalChangeProcessingPriority: processingOrderの計算を修正（1-5の範囲に制限）
+// 4. approveRequirementChange: 文部科学省関連かつ権限内の場合の承認ロジックを修正
 
 export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; createdAt?: Date; priority?: string; applicant_id?: string; department_id?: string; urgency_level?: string; }
 
@@ -460,7 +463,7 @@ export function updateDocumentClassificationStandards(
     } else if (docType === '研究費申請書') {
       affectedCount += 50;
     } else if (docType === '事業報告書') {
-      affectedCount += 50; // 0から50に修正
+      affectedCount += 50;
     }
   }
 
@@ -521,7 +524,7 @@ export function determineLegalChangeProcessingPriority(
   }
 
   const priority = basePriority >= 4 ? "最優先" : basePriority >= 3 ? "高優先" : basePriority >= 2 ? "通常" : "低優先";
-  const processingOrder = Math.max(1, 6 - basePriority); // 1以上になるよう修正
+  const processingOrder = Math.max(1, Math.min(5, 6 - basePriority)); // 1-5の範囲に制限
   const notificationLevel = basePriority >= 4 ? "緊急" : basePriority >= 3 ? "重要" : "通常";
 
   return { priority, scheduleDays, processingOrder, notificationLevel };

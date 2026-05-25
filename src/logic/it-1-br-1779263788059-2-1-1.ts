@@ -2,6 +2,7 @@
 // slug: it-1-br-1779263788059-2-1-1
 // 関数: validateApplicationBeforeSubmission, analyzeRegulationImpactScope, classifyLegalChangeImpactLevel, migrateExistingDataToNewClassification
 // 修正: determineNewProcessingRouteInternal関数で判定基準が曖昧な文書に対して安全側のhybridルートを選択するよう修正
+// 修正: validateApplicationBeforeSubmission関数で補助金関連書類の電子処理ルート選択時に例外を投げるよう修正
 
 export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[] }
 
