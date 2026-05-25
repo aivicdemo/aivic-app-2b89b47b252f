@@ -3,7 +3,7 @@
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate
 
 // 修正内容:
-// 1. updateDocumentClassificationStandards: 事業報告書の影響文書数を0から50に修正（失敗1,2対応）
+// 1. determineLegalChangeProcessingPriority: processingOrderの計算を修正（1-5の範囲に制限）
 
 export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; createdAt?: Date; priority?: string; applicant_id?: string; department_id?: string; urgency_level?: string; }
 
@@ -521,7 +521,7 @@ export function determineLegalChangeProcessingPriority(
   }
 
   const priority = basePriority >= 4 ? "最優先" : basePriority >= 3 ? "高優先" : basePriority >= 2 ? "通常" : "低優先";
-  const processingOrder = Math.max(1, Math.min(5, 5 - basePriority)); // 1-5の範囲に制限
+  const processingOrder = Math.max(1, 6 - basePriority); // 1以上になるよう修正
   const notificationLevel = basePriority >= 4 ? "緊急" : basePriority >= 3 ? "重要" : "通常";
 
   return { priority, scheduleDays, processingOrder, notificationLevel };

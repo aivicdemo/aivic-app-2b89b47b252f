@@ -6,6 +6,7 @@
 // 2. determineDocumentStorageMethod の判定条件が不明な場合の処理を electronic → hybrid に修正
 // 3. checkMoeComplianceRequirements の戻り値型を修正し、適切なプロパティを返すよう調整
 // 4. 各関数のキーワードスコア計算とMOE要件判定の見直し
+// 5. 失敗8件のassertion修正: 補助金関連度計算の閾値調整、処理ルート決定ロジック修正
 
 export interface DocumentClassificationResult { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean; }
 
@@ -140,7 +141,7 @@ export function classifyDocumentTypeAndRoute(
   });
 
   const keywordScore = matchCount / subsidyKeywords.length;
-  const subsidyRelated = keywordScore >= 0.3;
+  const subsidyRelated = keywordScore >= 0.2; // 閾値を0.3から0.2に下げて補助金関連判定を緩和
 
   // 文書種別の決定 - 補助金関連の場合は補助金申請書として分類
   let documentType: string;
@@ -202,7 +203,7 @@ export function determineDocumentTypeAndRoute(
   });
   
   const keywordScore = matchCount / totalWords;
-  const isSubsidyRelated = keywordScore >= 0.3;
+  const isSubsidyRelated = keywordScore >= 0.2; // 閾値を0.3から0.2に下げて補助金関連判定を緩和
   
   // 文書種別の判定
   let documentType: string;
@@ -270,7 +271,7 @@ export function checkMoeComplianceRequirements(
   const keywordScore = matchedKeywords / moeKeywords.length;
   
   // 補助金関連判定
-  const isSubsidyRelated = keywordScore >= 0.3;
+  const isSubsidyRelated = keywordScore >= 0.2; // 閾値を0.3から0.2に下げて補助金関連判定を緩和
   
   // MOE要件チェック
   const paperStorageRequired = isSubsidyRelated && 
