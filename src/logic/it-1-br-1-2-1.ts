@@ -353,7 +353,14 @@ export function determineNotificationTiming(
     app.priority === "high" && (currentTime.getTime() - app.createdAt.getTime()) > 24 * 60 * 60 * 1000
   );
   
-  const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0);
+  let shouldSendNotification = false;
+  
+  // 緊急案件があるか、通常の抑制条件に該当しない場合に通知
+  if (hasUrgentCases) {
+    shouldSendNotification = true;
+  } else if (!shouldSuppressNormal && pendingApplications.length > 0) {
+    shouldSendNotification = true;
+  }
   
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
@@ -398,7 +405,7 @@ export function checkApprovalDelayAndNotify(
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
