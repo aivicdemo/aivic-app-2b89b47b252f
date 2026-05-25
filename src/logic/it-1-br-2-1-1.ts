@@ -14,6 +14,10 @@ export interface DigitalizationResult { documentType: string; processingRoute: '
 
 export interface ExceptionHandlingResult { finalDocumentType: string; processingRoute: 'electronic' | 'hybrid'; exceptionReason: string; learningData: object }
 
+export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; from?: string; to?: string }
+
+export interface ChangeLog { documentType: string; from: string; to: string; affectedCount?: number }
+
 export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,
@@ -60,7 +64,9 @@ export function validateApplicationAmountAndPeriod(
   implementationStartDate: string,
   implementationEndDate: string,
   documentType: string,
-  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } }
+  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } },
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean } {
   if (applicationAmount <= 0 || !Number.isFinite(applicationAmount)) {
     throw new Error("申請金額は正の数値で入力してください");
@@ -104,7 +110,8 @@ export function validateApplicationAmountAndPeriod(
 export function classifyDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
-  applicantDepartment: string
+  applicantDepartment: string,
+  classificationRules?: ClassificationRule[]
 ): DocumentClassificationResult {
   // バリデーション
   if (!documentTitle || documentTitle.length < 10) {
@@ -176,7 +183,8 @@ export function classifyDocumentTypeAndRoute(
 export function determineDocumentTypeAndRoute(
   documentTitle: string,
   documentContent: string,
-  applicantDepartment: string
+  applicantDepartment: string,
+  changeLog?: ChangeLog
 ): DocumentTypeAndRouteResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === "") {
@@ -253,7 +261,9 @@ export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string,
-  moeRequirements?: string[]
+  moeRequirements?: string[],
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): ComplianceCheckResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === '') {
@@ -344,7 +354,9 @@ export function determineDigitalizationEligibility(
   documentTitle: string,
   documentContent: string,
   documentType: string,
-  subsidyRelevanceScore: number
+  subsidyRelevanceScore: number,
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): DigitalizationResult {
   if (!documentTitle) {
     throw new Error("申請書類のタイトルが入力されていません。タイトルを入力してください。");
@@ -371,7 +383,9 @@ export function determineProcessingRoute(
   documentType: string,
   subsidyRelatedScore: number,
   documentTitle: string,
-  documentContent: string
+  documentContent: string,
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): DigitalizationResult {
   // 制約チェック
   if (!documentTitle || documentTitle.trim() === '') {
@@ -401,7 +415,9 @@ export function handleDocumentClassificationException(
   documentContent: string,
   autoClassificationResult: string | null,
   staffObjection: string | null,
-  managerDecision: string
+  managerDecision: string,
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): ExceptionHandlingResult {
   if (!managerDecision) {
     throw new Error("例外処理には事務局長による最終判定が必要です");
@@ -446,7 +462,9 @@ export function determineDocumentStorageMethod(
   documentTitle: string,
   documentContent: string,
   documentType: string,
-  subsidyKeywords: string[] = []
+  subsidyKeywords: string[] = [],
+  classificationRules?: ClassificationRule[],
+  changeLog?: ChangeLog
 ): DocumentClassificationResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === "") {

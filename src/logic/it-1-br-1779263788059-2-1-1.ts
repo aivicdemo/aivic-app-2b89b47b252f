@@ -204,7 +204,7 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: ClassificationRule[],
+  newClassificationRules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }>,
   existingDocuments: Array<{ id: string; document_type?: string; current_processing_route?: string; title?: string; content?: string; documentType?: string }>,
   migrationScope: string
 ): MigrationResult {
@@ -233,7 +233,7 @@ export function migrateExistingDataToNewClassification(
     return true;
   };
 
-  const applyNewRulesInternal = (doc: any, rules: ClassificationRule[]): { processingRoute: string } => {
+  const applyNewRulesInternal = (doc: any, rules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }>): { processingRoute: string } => {
     const docType = doc.document_type || doc.documentType;
     
     for (const rule of rules) {
