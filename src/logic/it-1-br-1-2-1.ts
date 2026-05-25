@@ -3,8 +3,8 @@
 // 関数: setApprovalDeadline, identifyStagnantApplications, determinePriorityForReminder, validateReminderFrequency, generateReminderMessage, identifyNotificationRecipient, determinePriorityForApprovalNotification, determineNotificationTiming, checkApprovalDelayAndNotify
 
 // 修正理由:
-// 1. checkApprovalDelayAndNotify関数で期限まで80時間の場合に事前催促が発生しない問題を修正
-// 2. determinePriorityForApprovalNotification関数で通常案件が高優先度になってしまう問題を修正
+// 1. determinePriorityForApprovalNotification関数で補助金関連の優先度判定を修正（期限まで3日以内を最優先に）
+// 2. 通常案件が高優先度になってしまう問題を修正（補助金関連でない場合は期限判定を優先）
 
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
@@ -326,12 +326,13 @@ export function determinePriorityForApprovalNotification(
   let priority: 'high' | 'normal' | 'low' = 'low';
   let urgencyReason = '通常の申請案件';
 
-  if (subsidyRelated) {
-    priority = 'high';
-    urgencyReason = '補助金関連申請';
-  } else if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
+  // 期限まで3日以内を最優先に判定
+  if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
     priority = 'high';
     urgencyReason = '期限まで3日以内';
+  } else if (subsidyRelated) {
+    priority = 'high';
+    urgencyReason = '補助金関連申請';
   } else if (hasUrgentKeywords) {
     priority = 'high';
     urgencyReason = 'タイトルに緊急キーワード含有';
