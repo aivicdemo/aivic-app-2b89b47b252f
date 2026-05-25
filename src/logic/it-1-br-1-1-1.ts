@@ -1,69 +1,44 @@
-export interface SystemFailureRequest {
-  applicationId: string;
-  failureType: string;
-  severity: string;
+export interface ValidationResult {
+  isAmountValid: boolean;
+  isPeriodValid: boolean;
+  validationErrors: string[];
+  canProceed: boolean;
 }
 
-export interface SystemFailureResult {
-  fallbackMethod: string;
-  emergencyContactList: string[];
-  paperFormUrl: string;
-  syncRequired: boolean;
-}
-
-export function handleSystemFailure(request: SystemFailureRequest): SystemFailureResult {
-  if (request.severity === "critical" || request.failureType === "database_failure") {
-    return {
-      fallbackMethod: "emergency_paper",
-      emergencyContactList: ["contact1@university.ac.jp", "contact2@university.ac.jp"],
-      paperFormUrl: "https://system.university.ac.jp/forms/APP_20240115_001.pdf",
-      syncRequired: true
-    };
+export function validateApplicationAmount(
+  amount: number,
+  budgetLimit: number,
+  applicationPeriod: string,
+  currentDate: string
+): ValidationResult {
+  const errors: string[] = [];
+  
+  // 金額チェック
+  const isAmountValid = amount <= budgetLimit;
+  if (!isAmountValid) {
+    errors.push('申請金額が予算上限を超えています');
   }
-
+  
+  // 期間チェック
+  const isPeriodValid = isValidApplicationPeriod(applicationPeriod, currentDate);
+  if (!isPeriodValid) {
+    errors.push('申請期間が無効です');
+  }
+  
   return {
-    fallbackMethod: "system_recovery",
-    emergencyContactList: [],
-    paperFormUrl: "",
-    syncRequired: false
+    isAmountValid,
+    isPeriodValid,
+    validationErrors: errors,
+    canProceed: isAmountValid && isPeriodValid
   };
 }
 
-export interface ViewPermissionRequest {
-  userId: string;
-  userRole: string;
-  applicationId: string;
-}
-
-export interface ViewPermissionResult {
-  canView: boolean;
-  viewLevel: string;
-  allowedFields: string[];
-}
-
-export function checkViewPermission(request: ViewPermissionRequest): ViewPermissionResult {
-  // 管理者権限での全案件表示
-  if (request.userRole === "admin") {
-    return {
-      canView: true,
-      viewLevel: "progress",
-      allowedFields: ["status", "currentApprover"]
-    };
-  }
-
-  // 一般ユーザーは制限あり
-  if (request.userRole === "user") {
-    return {
-      canView: true,
-      viewLevel: "basic",
-      allowedFields: ["status"]
-    };
-  }
-
-  // その他は閲覧不可
-  return {
-    canView: false,
-    viewLevel: "none",
-    allowedFields: []
-  };
+function isValidApplicationPeriod(applicationPeriod: string, currentDate: string): boolean {
+  // 申請期間の形式: "2024-01-01 to 2024-12-31"
+  const [startDate, endDate] = applicationPeriod.split(' to ');
+  const current = new Date(currentDate);
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  return current >= start && current <= end;
 }

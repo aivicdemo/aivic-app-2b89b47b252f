@@ -1,50 +1,29 @@
-export interface ProgressVisualizationRequest {
-  applicationId: string;
-  userId: string;
-  userRole: string;
+export interface SystemFailureFallbackResult {
+  fallbackMethod: string;
+  emergencyContactList: string[];
+  paperFormUrl: string;
+  syncRequired: boolean;
 }
 
-export interface ProgressVisualizationResult {
-  canView: boolean;
-  viewLevel: string;
-  allowedFields: string[];
-  progressData?: {
-    currentStep: number;
-    totalSteps: number;
-    approvalHistory: any[];
-    estimatedCompletion: string;
-  };
-}
-
-export function getProgressVisualization(request: ProgressVisualizationRequest): ProgressVisualizationResult {
-  // 管理者権限での全案件表示
-  if (request.userRole === "admin") {
+export function handleSystemFailureFallback(
+  systemStatus: string,
+  applicationId: string,
+  userRole: string
+): SystemFailureFallbackResult {
+  if (systemStatus === "data_inconsistency_detected") {
     return {
-      canView: true,
-      viewLevel: "progress",
-      allowedFields: ["status", "currentApprover"],
-      progressData: {
-        currentStep: 2,
-        totalSteps: 4,
-        approvalHistory: [],
-        estimatedCompletion: "2024-01-20"
-      }
+      fallbackMethod: "temporary_workaround",
+      emergencyContactList: ["relevant_staff", "it_support"],
+      paperFormUrl: `http://emergency-forms.university.ac.jp/paper/${applicationId}`,
+      syncRequired: true
     };
   }
-
-  // 一般ユーザーは基本情報のみ
-  if (request.userRole === "user") {
-    return {
-      canView: true,
-      viewLevel: "basic",
-      allowedFields: ["status"]
-    };
-  }
-
-  // その他は閲覧不可
+  
+  // 通常の障害時は紙ベース代替手段
   return {
-    canView: false,
-    viewLevel: "none",
-    allowedFields: []
+    fallbackMethod: "emergency_paper",
+    emergencyContactList: ["contact1@university.ac.jp", "contact2@university.ac.jp"],
+    paperFormUrl: "https://system.university.ac.jp/forms/APP_20240115_001.pdf",
+    syncRequired: true
   };
 }
