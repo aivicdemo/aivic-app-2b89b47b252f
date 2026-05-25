@@ -12,11 +12,9 @@ export interface MigrationResult { migratedCount: number; skippedCount: number; 
 
 export interface DocumentType { typeName: string; regulationCategory: string; storageRequirement: string }
 
-export interface ProcessingRule { document_type: string }
+export interface ClassificationRule { documentType: string; keywords?: string[]; threshold?: number; processingRoute: string; paperStorageRequired?: boolean }
 
-export interface ClassificationRule { documentType: string; keywords?: string[]; threshold?: number; paperStorageRequired?: boolean; processingRoute: string }
-
-export interface ExistingDocument { id: string; title?: string | null; content?: string; document_type?: string; current_processing_route: string; created_date?: Date }
+export interface Document { id: string; title?: string; content?: string; document_type?: string; current_processing_route: string; created_date?: Date; documentType?: string }
 
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
@@ -41,11 +39,7 @@ export function validateApplicationBeforeSubmission(
 
   // 補助金関連書類の処理ルートチェック
   if (documentType === "subsidy" && processingRoute !== "hybrid") {
-    if (processingRoute === "electronic") {
-      throw new Error("補助金関連書類は紙保管が必要なため、ハイブリッド処理を選択してください");
-    } else {
-      errors.push("補助金関連書類はハイブリッド処理が必要です");
-    }
+    throw new Error("補助金関連書類は紙保管が必要なため、ハイブリッド処理を選択してください");
   }
 
   // 承認者設定チェック
@@ -53,11 +47,16 @@ export function validateApplicationBeforeSubmission(
     throw new Error("承認者を1名以上設定してください");
   }
 
-  // 必須項目チェック
+  // 必須項目入力チェック
   for (const field in requiredFields) {
-    if (!requiredFields[field] || requiredFields[field] === "") {
+    if (!requiredFields[field]) {
       errors.push(`必須項目「${field}」を入力してください`);
     }
+  }
+
+  // 補助金関連書類でハイブリッド処理以外の場合のエラー（throw以外のケース）
+  if (documentType === "subsidy" && processingRoute !== "hybrid") {
+    errors.push("補助金関連書類はハイブリッド処理が必要です");
   }
 
   const isValid = errors.length === 0;
@@ -82,12 +81,16 @@ export function analyzeRegulationImpactScope(
   const routeChanges: Array<{ documentType: string; oldRoute: string; newRoute: string }> = [];
 
   for (const docType of currentDocumentTypes) {
-    if (affectedRegulationTypes.includes(docType.regulationCategory)) {
+    const isAffected = affectedRegulationTypes.some(regType => 
+      docType.regulationCategory.includes(regType) || regType.includes(docType.regulationCategory)
+    );
+
+    if (isAffected) {
       affectedTypes.push(docType.typeName);
       
       const currentRoute = docType.storageRequirement;
       let newRoute = currentRoute;
-      
+
       if (regulationChangeContent.includes("紙保管を必須") || regulationChangeContent.includes("紙保存要件")) {
         if (currentRoute === "electronic") {
           newRoute = "hybrid";
@@ -97,7 +100,7 @@ export function analyzeRegulationImpactScope(
           newRoute = "electronic";
         }
       }
-      
+
       if (currentRoute !== newRoute) {
         routeChanges.push({
           documentType: docType.typeName,
@@ -128,10 +131,10 @@ export function analyzeRegulationImpactScope(
 export function classifyLegalChangeImpactLevel(
   changeNotification: string,
   affectedDocumentTypes: string[],
-  currentProcessingRules: ProcessingRule[],
+  currentProcessingRules: Array<{document_type: string}>,
   complianceDeadline: Date
 ): LegalChangeImpactResult {
-  if (!changeNotification || changeNotification.trim() === '') {
+  if (!changeNotification || changeNotification.trim() === "") {
     throw new Error("法令改正通知の内容が正しく取得できません。通知内容を確認してください。");
   }
 
@@ -140,11 +143,11 @@ export function classifyLegalChangeImpactLevel(
     affectedDocumentTypes.includes(rule.document_type)
   ).length;
   const daysUntilDeadline = Math.floor((complianceDeadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-
+  
   let impactLevel: string = "low";
-  let priority = 3;
-  let requiredResponseDays = 60;
-
+  let priority: number = 3;
+  let requiredResponseDays: number = 60;
+  
   if (hasSubsidyRequirementChange && (affectedRuleCount >= 10 || daysUntilDeadline < 30)) {
     impactLevel = "high";
     priority = 1;
@@ -154,10 +157,10 @@ export function classifyLegalChangeImpactLevel(
     priority = 2;
     requiredResponseDays = 30;
   }
-
+  
   const riskAssessment = impactLevel === "high" ? "法令違反リスク高" : 
                         impactLevel === "medium" ? "業務遅延リスク中" : "影響軽微";
-
+  
   return {
     impactLevel,
     priority,
@@ -169,36 +172,58 @@ export function classifyLegalChangeImpactLevel(
 
 export function migrateExistingDataToNewClassification(
   newClassificationRules: ClassificationRule[],
-  existingDocuments: ExistingDocument[],
+  existingDocuments: Document[],
   migrationScope: string
 ): MigrationResult {
   if (newClassificationRules.length === 0) {
     throw new Error("法令改正に基づく新しい分類基準が設定されていません。分類基準を確認してください。");
   }
 
+  const isInMigrationScopeInternal = (doc: Document, scope: string): boolean => {
+    const docType = doc.document_type || doc.documentType || '';
+    const title = doc.title || '';
+    const content = doc.content || '';
+    
+    if (scope.includes('補助金') && (docType.includes('補助金') || title.includes('補助金') || content.includes('補助金'))) {
+      return true;
+    }
+    if (scope.includes('設備購入') && (docType.includes('設備') || title.includes('設備') || content.includes('設備'))) {
+      return true;
+    }
+    if (scope === 'subsidy_related' && (docType.includes('補助金') || title.includes('補助金') || content.includes('補助金'))) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const applyNewRulesInternal = (doc: Document, rules: ClassificationRule[]): ClassificationRule => {
+    const docType = doc.document_type || doc.documentType || '';
+    
+    for (const rule of rules) {
+      if (rule.documentType === docType) {
+        return rule;
+      }
+    }
+    
+    return { documentType: docType, processingRoute: doc.current_processing_route };
+  };
+
+  const targetDocuments = existingDocuments.filter(doc => isInMigrationScopeInternal(doc, migrationScope));
+  
   let migratedCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
   const updatedRoutes: Array<{ documentId: string; oldRoute: string; newRoute: string }> = [];
 
-  for (const document of existingDocuments) {
+  for (const document of targetDocuments) {
     try {
-      // 移行対象かどうかを判定
-      const isInScope = isDocumentInMigrationScope(document, migrationScope);
-      
-      if (!isInScope) {
-        skippedCount++;
-        continue;
-      }
-
-      // 新しい分類基準を適用
-      const matchingRule = findMatchingClassificationRule(document, newClassificationRules);
-      
-      if (matchingRule && matchingRule.processingRoute !== document.current_processing_route) {
+      const newClassification = applyNewRulesInternal(document, newClassificationRules);
+      if (newClassification.processingRoute !== document.current_processing_route) {
         updatedRoutes.push({
           documentId: document.id,
           oldRoute: document.current_processing_route,
-          newRoute: matchingRule.processingRoute
+          newRoute: newClassification.processingRoute
         });
         migratedCount++;
       } else {
@@ -215,25 +240,4 @@ export function migrateExistingDataToNewClassification(
     errorCount,
     updatedRoutes
   };
-}
-
-function isDocumentInMigrationScope(document: ExistingDocument, migrationScope: string): boolean {
-  if (migrationScope === "subsidy_related") {
-    return document.document_type === "補助金申請書";
-  }
-  
-  if (migrationScope === "補助金関連書類") {
-    return document.document_type === "補助金申請書";
-  }
-  
-  if (migrationScope === "補助金関連および設備購入関連") {
-    return document.document_type === "補助金申請書" || 
-           document.document_type === "設備購入申請書";
-  }
-  
-  return true;
-}
-
-function findMatchingClassificationRule(document: ExistingDocument, rules: ClassificationRule[]): ClassificationRule | null {
-  return rules.find(rule => rule.documentType === document.document_type) || null;
 }

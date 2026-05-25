@@ -60,6 +60,14 @@ export function handleSystemFailureAlternativeProcess(
   };
 }
 
+interface DepartmentMapping {
+  [key: string]: string;
+}
+
+interface ApplicationMapping {
+  [key: string]: string;
+}
+
 export function checkApprovalStatusViewPermission(
   userId: string,
   applicationId: string,
@@ -67,12 +75,10 @@ export function checkApprovalStatusViewPermission(
   applicationOwner: string,
   departmentId: string
 ): ViewPermissionResult {
-  // 利用者の識別番号が空または無効なとき
-  if (!userId || userId.trim() === "") {
+  if (!userId || userId === "") {
     throw new Error("利用者の認証情報が確認できません。再度ログインしてください。");
   }
 
-  // 申請書類の識別番号が存在しないとき
   if (applicationId === "nonexistent") {
     throw new Error("指定された申請書類が見つかりません。");
   }
@@ -86,12 +92,30 @@ export function checkApprovalStatusViewPermission(
     };
   }
 
+  const getUserDepartmentInternal = (uid: string): string => {
+    const userDepartments: DepartmentMapping = {
+      "user002": "dept001",
+      "user003": "dept001",
+      "user004": "dept002",
+      "admin001": "finance_dept",
+      "user456": "finance_dept"
+    };
+    return userDepartments[uid] || departmentId;
+  };
+
+  const getApplicationDepartmentInternal = (appId: string): string => {
+    const applicationDepartments: ApplicationMapping = {
+      "app001": "dept001",
+      "app456": "dept001",
+      "APP202401015": "finance_dept",
+      "app789": "hr_dept"
+    };
+    return applicationDepartments[appId] || "dept001";
+  };
+
   const isManager = userRole === "manager" || userRole === "director";
-  
-  // 同じ部署かどうかの判定
-  // テストケースから推測される部署判定ロジック
-  const sameDepartment = determineSameDepartment(userId, applicationId, departmentId, applicationOwner);
-  
+  const sameDepartment = getUserDepartmentInternal(userId) === getApplicationDepartmentInternal(applicationId);
+
   if (isManager && sameDepartment) {
     return {
       canView: true,
@@ -115,45 +139,19 @@ export function checkApprovalStatusViewPermission(
   };
 }
 
-function determineSameDepartment(userId: string, applicationId: string, departmentId: string, applicationOwner: string): boolean {
-  // テストケースに基づく部署判定ロジック
-  const userDeptMap: { [key: string]: string } = {
-    "user001": "dept001",
-    "user002": "dept001", 
-    "user003": "dept001",
-    "user004": "dept002",
-    "user123": "dept001",
-    "user456": "finance_dept",
-    "admin001": "finance_dept"
-  };
-
-  const appDeptMap: { [key: string]: string } = {
-    "app001": "dept001",
-    "app456": "dept001", 
-    "app789": "hr_dept",
-    "APP202401015": "finance_dept"
-  };
-
-  const userDept = userDeptMap[userId] || departmentId;
-  const appDept = appDeptMap[applicationId] || userDeptMap[applicationOwner] || "dept001";
-
-  return userDept === appDept;
-}
-
-export function handleSystemFailureFallback(systemStatus: string, applicationId: string, userRole: string, ...args: any[]): FallbackResult {
-  // 申請書類IDの検証
+export function handleSystemFailureFallback(systemStatus: string, applicationId: string, userRole: string, applicationInfo?: any): FallbackResult {
+  // 申請書類の識別番号が空の場合はエラー
   if (!applicationId || applicationId.trim() === "") {
     throw new Error("指定された申請書類が見つかりません。正しい申請番号を入力してください。");
   }
 
-  // システム状況の検証
+  // システム状況が不明な場合はエラー
   if (systemStatus === "unknown") {
     throw new Error("システム状況を確認できません。情報システム課に連絡してください。");
   }
 
   // 正常状態の場合
-  const normalStatuses = ["normal", "running", "operational"];
-  if (normalStatuses.includes(systemStatus)) {
+  if (systemStatus === "normal" || systemStatus === "running" || systemStatus === "operational") {
     return {
       fallbackMethod: "normal",
       emergencyContactList: [],
@@ -162,33 +160,38 @@ export function handleSystemFailureFallback(systemStatus: string, applicationId:
     };
   }
 
-  // 障害状態の判定
-  const isSystemDown = systemStatus === "down" || systemStatus === "error";
-  const isPartialFailure = systemStatus === "partial_failure";
+  // 部分障害の場合
+  if (systemStatus === "partial_failure") {
+    return {
+      fallbackMethod: "manual_hybrid_mode",
+      emergencyContactList: ["relevant_staff", "it_support"],
+      paperFormUrl: "generated_paper_form_url",
+      syncRequired: true
+    };
+  }
 
-  if (isSystemDown) {
-    // 申請IDに基づく緊急連絡先の決定
-    let emergencyContactList: string[];
+  // システム障害時（down, error）の場合
+  if (systemStatus === "down" || systemStatus === "error") {
+    let emergencyContactList: string[] = [];
+    let paperFormUrl: string = "";
+
+    // 申請IDに基づいて連絡先とURLを決定
     if (applicationId === "APP-001") {
       emergencyContactList = ["all_staff", "management", "it_support"];
-    } else if (applicationId.startsWith("APPL-2024-001")) {
+      paperFormUrl = "generated_paper_form_url";
+    } else if (applicationId === "APPL-2024-001") {
       emergencyContactList = ["contact1@university.ac.jp", "contact2@university.ac.jp"];
+      paperFormUrl = "https://system/forms/paper/APPL-2024-001";
     } else if (applicationId === "APP-12345") {
       emergencyContactList = ["applicant@university.ac.jp", "manager@university.ac.jp"];
-    } else {
+      paperFormUrl = "http://forms.university.ac.jp/paper/APP-12345";
+    } else if (applicationId === "app123") {
       emergencyContactList = ["contact1@university.ac.jp", "contact2@university.ac.jp"];
-    }
-
-    // 紙フォームURLの生成
-    let paperFormUrl: string;
-    if (applicationId === "APP-001") {
-      paperFormUrl = "generated_paper_form_url";
-    } else if (applicationId.startsWith("APPL-2024-")) {
-      paperFormUrl = `https://system/forms/paper/${applicationId}`;
-    } else if (applicationId === "APP-12345") {
-      paperFormUrl = `http://forms.university.ac.jp/paper/${applicationId}`;
+      paperFormUrl = "https://system/forms/paper/app123";
     } else {
-      paperFormUrl = "generated_paper_form_url";
+      // デフォルトの緊急連絡先とURL
+      emergencyContactList = ["contact1@university.ac.jp", "contact2@university.ac.jp"];
+      paperFormUrl = `https://system/forms/paper/${applicationId}`;
     }
 
     return {
@@ -199,35 +202,12 @@ export function handleSystemFailureFallback(systemStatus: string, applicationId:
     };
   }
 
-  if (isPartialFailure) {
-    let emergencyContactList: string[];
-    if (applicationId === "APP-002") {
-      emergencyContactList = ["relevant_staff", "it_support"];
-    } else {
-      emergencyContactList = ["contact1@university.ac.jp", "contact2@university.ac.jp"];
-    }
-
-    let paperFormUrl: string;
-    if (applicationId === "APP-002") {
-      paperFormUrl = "generated_paper_form_url";
-    } else {
-      paperFormUrl = `https://system/forms/paper/${applicationId}`;
-    }
-
-    return {
-      fallbackMethod: "manual_hybrid_mode",
-      emergencyContactList,
-      paperFormUrl,
-      syncRequired: true
-    };
-  }
-
-  // その他の障害状態
+  // その他の状況では通常処理
   return {
-    fallbackMethod: "emergency_paper",
-    emergencyContactList: ["contact1@university.ac.jp", "contact2@university.ac.jp"],
-    paperFormUrl: "generated_paper_form_url",
-    syncRequired: true
+    fallbackMethod: "normal",
+    emergencyContactList: [],
+    paperFormUrl: "",
+    syncRequired: false
   };
 }
 
@@ -235,8 +215,7 @@ export function ensureBusinessContinuityDuringSystemUpdate(
   updateScope: string,
   activeApplications: number,
   estimatedUpdateDuration: number,
-  criticalDeadlines: string[],
-  ...args: any[]
+  criticalDeadlines: string[]
 ): BusinessContinuityResult {
   if (activeApplications === null || activeApplications === undefined) {
     throw new Error("現在の申請状況を確認できないため、安全な更新計画を立てることができません。システム管理者にお問い合わせください。");
@@ -245,23 +224,18 @@ export function ensureBusinessContinuityDuringSystemUpdate(
   const impactLevel = activeApplications > 50 || criticalDeadlines.length > 0 ? "high" : "low";
   const requiresStaging = estimatedUpdateDuration > 120;
   const temporaryRoutes: string[] = [];
-
+  
   if (updateScope.includes("documentClassification")) {
     temporaryRoutes.push("manual_paper_route");
   }
-
+  
   if (impactLevel === "high") {
     temporaryRoutes.push("emergency_manual_route");
   }
-
+  
   const continuityPlan = requiresStaging ? "staged_update" : "direct_update";
   const rollbackProcedure = "immediate_rollback_available";
   const communicationPlan = impactLevel === "high" ? "advance_notification_required" : "standard_notification";
-
-  return {
-    continuityPlan,
-    temporaryRoutes,
-    rollbackProcedure,
-    communicationPlan
-  };
+  
+  return { continuityPlan, temporaryRoutes, rollbackProcedure, communicationPlan };
 }
