@@ -345,7 +345,7 @@ export function determineNotificationTiming(
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
   if (approverWorkload > 80) {
-    baseFrequency = baseFrequency * 3;
+    baseFrequency = baseFrequency * 2; // 修正: 3倍から2倍に変更
   }
   
   const nextNotificationTime = new Date(currentTime.getTime() + baseFrequency * 60 * 1000);
@@ -449,9 +449,9 @@ export function checkApprovalDelayAndNotify(
 }
 
 export function classifyDocumentsByRoute(
-  documents: ClassificationRule[],
-  classificationRules: ClassificationRule[]
-): ClassificationRule[] {
+  documents: Array<{documentType: string; processingRoute: string}>,
+  classificationRules: Array<{documentType: string; processingRoute: string}>
+): Array<{documentType: string; processingRoute: string}> {
   return classificationRules;
 }
 

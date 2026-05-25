@@ -1,12 +1,130 @@
 {
-  "ユーザー": [],
-  "申請書類": [],
-  "文書種別マスタ": [],
-  "承認フロー定義": [],
-  "承認ステップ": [],
-  "承認履歴": [],
-  "通知履歴": [],
-  "処理ルート": [],
-  "遅延検知設定": [],
-  "補助金関連度マスタ": []
+  "Users": [
+    {
+      "id": "user001",
+      "name": "田中太郎",
+      "password": "password123",
+      "role": "applicant",
+      "department": "総務部",
+      "email": "tanaka@university.ac.jp"
+    },
+    {
+      "id": "user002",
+      "name": "佐藤花子",
+      "password": "password456",
+      "role": "approver",
+      "department": "経理部",
+      "email": "sato@university.ac.jp"
+    },
+    {
+      "id": "admin",
+      "name": "管理者",
+      "password": "admin123",
+      "role": "admin",
+      "department": "システム管理部",
+      "email": "admin@university.ac.jp"
+    },
+    {
+      "id": "maxlength_user_id_test_123456789",
+      "name": "最大文字数テストユーザー",
+      "password": "password",
+      "role": "applicant",
+      "department": "テスト部",
+      "email": "maxtest@university.ac.jp"
+    },
+    {
+      "id": "special_user",
+      "name": "特殊文字テストユーザー",
+      "password": "P@ssw0rd!#$%^&*()_+-=[]{}|;:,.<>?",
+      "role": "applicant",
+      "department": "テスト部",
+      "email": "special@university.ac.jp"
+    }
+  ],
+  "Applications": [
+    {
+      "id": "APP_20240115_001",
+      "title": "備品購入申請",
+      "description": "プリンター購入のための申請",
+      "documentType": "purchase",
+      "urgency": "normal",
+      "amount": 50000,
+      "status": "pending",
+      "submittedAt": "2024-01-15T09:00:00Z",
+      "applicantId": "user001",
+      "approvalFlow": {
+        "type": "standard",
+        "approvers": ["user002"],
+        "currentStep": 0
+      }
+    },
+    {
+      "id": "APP_20240116_002",
+      "title": "緊急修理申請",
+      "description": "空調設備の緊急修理",
+      "documentType": "maintenance",
+      "urgency": "urgent",
+      "amount": 200000,
+      "status": "approved",
+      "submittedAt": "2024-01-16T14:30:00Z",
+      "applicantId": "user001",
+      "approvalFlow": {
+        "type": "expedited",
+        "approvers": ["user002"],
+        "currentStep": 1
+      }
+    }
+  ],
+  "Documents": [
+    {
+      "id": "DOC_001",
+      "fileName": "purchase_request.pdf",
+      "fileType": "application/pdf",
+      "documentType": "purchase",
+      "uploadedAt": "2024-01-15T08:45:00Z",
+      "status": "processed",
+      "applicationId": "APP_20240115_001"
+    },
+    {
+      "id": "DOC_002",
+      "fileName": "emergency_repair.pdf",
+      "fileType": "application/pdf",
+      "documentType": "maintenance",
+      "uploadedAt": "2024-01-16T14:15:00Z",
+      "status": "processed",
+      "applicationId": "APP_20240116_002"
+    }
+  ],
+  "AccountLocks": [],
+  "BudgetLimits": [
+    {
+      "documentType": "purchase",
+      "maxAmount": 100000,
+      "validPeriodStart": "2024-01-01T00:00:00Z",
+      "validPeriodEnd": "2024-12-31T23:59:59Z"
+    },
+    {
+      "documentType": "maintenance",
+      "maxAmount": 500000,
+      "validPeriodStart": "2024-01-01T00:00:00Z",
+      "validPeriodEnd": "2024-12-31T23:59:59Z"
+    }
+  ],
+  "SystemStatus": [
+    {
+      "id": "main_system",
+      "status": "operational",
+      "lastChecked": "2024-01-20T10:00:00Z"
+    }
+  ],
+  "EmergencyContacts": [
+    {
+      "type": "it_support",
+      "contacts": ["contact1@university.ac.jp", "contact2@university.ac.jp"]
+    },
+    {
+      "type": "management",
+      "contacts": ["manager1@university.ac.jp", "manager2@university.ac.jp"]
+    }
+  ]
 }

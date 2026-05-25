@@ -276,7 +276,12 @@ export function classifyDocumentTypeAndRoute(
     documentType,
     processingRoute,
     subsidyRelated,
-    paperStorageRequired
+    paperStorageRequired,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    isSubsidyRelated: subsidyRelated,
+    requiresPaperStorage: paperStorageRequired
   };
 }
 
@@ -328,7 +333,7 @@ export function determineDocumentTypeAndRoute(
   let documentType: string;
   if (isSubsidyRelated) {
     if (documentTitle.includes('申請書') || documentTitle.includes('申請')) {
-      documentType = '補助金申請';
+      documentType = '補助金申請書';
     } else {
       documentType = '補助金申請';
     }
@@ -351,7 +356,12 @@ export function determineDocumentTypeAndRoute(
     documentType,
     processingRoute,
     isSubsidyRelated,
-    requiresPaperStorage
+    requiresPaperStorage,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    subsidyRelated: isSubsidyRelated,
+    paperStorageRequired: requiresPaperStorage
   };
 }
 
@@ -435,7 +445,12 @@ export function checkMoeComplianceRequirements(
     subsidyRelated,
     paperStorageRequired,
     complianceStatus,
-    riskLevel
+    riskLevel,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    isSubsidyRelated: subsidyRelated,
+    requiresPaperStorage: paperStorageRequired
   };
 }
 
@@ -462,7 +477,12 @@ export function determineDigitalizationEligibility(
     documentType,
     processingRoute,
     subsidyRelated,
-    paperStorageRequired
+    paperStorageRequired,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    isSubsidyRelated: subsidyRelated,
+    requiresPaperStorage: paperStorageRequired
   };
 }
 
@@ -490,7 +510,12 @@ export function determineProcessingRoute(
     documentType,
     processingRoute,
     subsidyRelated,
-    paperStorageRequired
+    paperStorageRequired,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    isSubsidyRelated: subsidyRelated,
+    requiresPaperStorage: paperStorageRequired
   };
 }
 
@@ -539,7 +564,15 @@ export function handleDocumentClassificationException(
     finalDocumentType,
     processingRoute,
     exceptionReason,
-    learningData
+    learningData,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    subsidyRelated: finalDocumentType.includes('補助金'),
+    paperStorageRequired: processingRoute === 'hybrid',
+    isSubsidyRelated: finalDocumentType.includes('補助金'),
+    documentType: finalDocumentType,
+    requiresPaperStorage: processingRoute === 'hybrid'
   };
 }
 
@@ -595,6 +628,11 @@ export function determineDocumentStorageMethod(
     documentType,
     processingRoute,
     subsidyRelated,
-    paperStorageRequired
+    paperStorageRequired,
+    isValid: true,
+    errors: [],
+    warnings: [],
+    isSubsidyRelated: subsidyRelated,
+    requiresPaperStorage: paperStorageRequired
   };
 }

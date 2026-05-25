@@ -205,7 +205,7 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: ClassificationRule[],
+  newClassificationRules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number }>,
   existingDocuments: Array<{ id: string; document_type?: string; current_processing_route: string; title?: string; content?: string; documentType?: string }>,
   migrationScope: string
 ): MigrationResult {
@@ -234,7 +234,7 @@ export function migrateExistingDataToNewClassification(
     return false;
   };
 
-  const applyNewRulesInternal = (doc: any, rules: ClassificationRule[]): { processingRoute: string } => {
+  const applyNewRulesInternal = (doc: any, rules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number }>): { processingRoute: string } => {
     const matchingRule = rules.find(rule => rule.documentType === doc.document_type || rule.documentType === doc.documentType);
     if (matchingRule) {
       return { processingRoute: matchingRule.processingRoute };
@@ -277,5 +277,25 @@ export function migrateExistingDataToNewClassification(
     skippedCount,
     errorCount,
     updatedRoutes
+  };
+}
+
+export function classifyDocumentAndDetermineRoute(
+  documentTitle: string,
+  documentContent: string,
+  documentType: string,
+  keywords: string[]
+): DocumentClassificationResult {
+  const isSubsidyRelated = keywords.some(keyword => 
+    documentTitle.includes(keyword) || documentContent.includes(keyword)
+  ) || documentType === "補助金申請書";
+
+  const processingRoute = isSubsidyRelated ? "hybrid" : "electronic";
+
+  return {
+    documentType: documentType,
+    processingRoute: processingRoute,
+    subsidyRelated: isSubsidyRelated,
+    paperStorageRequired: isSubsidyRelated
   };
 }
