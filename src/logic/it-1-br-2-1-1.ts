@@ -79,6 +79,16 @@ export interface ExceptionHandlingResult {
   requiresPaperStorage?: boolean;
 }
 
+export interface ClassificationRule {
+  documentType: string;
+  processingRoute: string;
+}
+
+export interface ChangeRequirement {
+  from: string;
+  to: string;
+}
+
 export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,

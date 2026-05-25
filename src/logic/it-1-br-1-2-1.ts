@@ -28,6 +28,8 @@ export interface MigrationResult { isValid: boolean }
 
 export interface ChangeLog { updatedRoutes: string[] }
 
+export interface ChangeRequirement { from: string; to: string }
+
 export function setApprovalDeadline(documentType: string, subsidyRelated: boolean, urgencyLevel: string, submissionDate: Date): ApprovalDeadlineResult {
   // 提出日が未来の日付かチェック
   const now = new Date();
@@ -343,7 +345,7 @@ export function determineNotificationTiming(
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
   if (approverWorkload > 80) {
-    baseFrequency = baseFrequency * 2;
+    baseFrequency = baseFrequency * 3;
   }
   
   const nextNotificationTime = new Date(currentTime.getTime() + baseFrequency * 60 * 1000);
@@ -379,7 +381,7 @@ export function checkApprovalDelayAndNotify(
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
@@ -447,9 +449,9 @@ export function checkApprovalDelayAndNotify(
 }
 
 export function classifyDocumentsByRoute(
-  documents: Array<{documentType: string; processingRoute: string}>,
-  classificationRules: Array<{documentType: string; processingRoute: string}>
-): Array<{documentType: string; processingRoute: string}> {
+  documents: ClassificationRule[],
+  classificationRules: ClassificationRule[]
+): ClassificationRule[] {
   return classificationRules;
 }
 
@@ -468,8 +470,8 @@ export function migrateToNewProcessingRoute(
 }
 
 export function logProcessingRouteChanges(
-  changeDetails: string,
+  changeDetails: ChangeRequirement,
   timestamp: Date
 ): ChangeLog {
-  return { updatedRoutes: [] };
+  return { updatedRoutes: [changeDetails.from, changeDetails.to] };
 }
