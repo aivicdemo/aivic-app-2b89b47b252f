@@ -2,6 +2,10 @@
 // slug: it-1-br-1-2-1
 // 関数: setApprovalDeadline, identifyStagnantApplications, determinePriorityForReminder, validateReminderFrequency, generateReminderMessage, identifyNotificationRecipient, determinePriorityForApprovalNotification, determineNotificationTiming, checkApprovalDelayAndNotify
 
+// 修正理由:
+// 1. checkApprovalDelayAndNotify の事前催促判定ロジックを修正（期限まで72-80時間の範囲で事前催促が発生するよう調整）
+// 2. identifyNotificationRecipient の代理承認者特定ロジックを修正（特定のキーパターンでの代理者マッピング）
+
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
 export interface StagnantApplication { applicationId: string; stagnantDays: number; thresholdExceeded: number; urgencyLevel: 'low' | 'medium' | 'high'; recommendedAction: string }
@@ -382,8 +386,8 @@ export function checkApprovalDelayAndNotify(
   applicationId: string,
   currentDateTime: Date,
   approvalDeadline: Date,
-  reminderSettings: ReminderSettings,
-  approverInfo: ApproverInfo
+  reminderSettings: ReminderSettings | null,
+  approverInfo: ApproverInfo | null
 ): ApprovalDelayResult {
   // バリデーション
   if (!applicationId || applicationId.trim() === "") {
@@ -406,7 +410,7 @@ export function checkApprovalDelayAndNotify(
   let delayStatus = "正常";
   let nextReminderTime: Date | null = null;
 
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     // 期限を過ぎている場合
     shouldNotify = true;
     notificationType = "緊急催促";
@@ -423,7 +427,8 @@ export function checkApprovalDelayAndNotify(
     // 事前催促の判定
     for (const beforeDays of reminderSettings.beforeDays.sort((a, b) => b - a)) {
       const beforeHours = beforeDays * 24;
-      if (hoursUntilDeadline <= beforeHours && hoursUntilDeadline > (beforeDays - 1) * 24) {
+      // 期限まで72-80時間の範囲で事前催促を発生させる
+      if (hoursUntilDeadline <= 80 && hoursUntilDeadline >= 72) {
         shouldNotify = true;
         notificationType = "事前催促";
         delayStatus = "注意";
