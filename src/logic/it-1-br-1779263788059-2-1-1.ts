@@ -43,8 +43,8 @@ export function classifyDocumentTypeAndRoute(
                              documentContent.includes("申請");
 
   let documentType = "一般申請書";
-  let processingRoute: string = "electronic";
-  let paperStorageRequired = false;
+  let processingRoute: string = "hybrid"; // デフォルトを hybrid に変更
+  let paperStorageRequired = true; // デフォルトを true に変更
 
   if (isSubsidyRelated) {
     documentType = "補助金申請書";

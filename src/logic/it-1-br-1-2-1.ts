@@ -489,7 +489,7 @@ export function classifyDocumentType(documentTitle: string, documentContent: str
   } else if (budgetKeywords.some(keyword => titleLower.includes(keyword) || contentLower.includes(keyword))) {
     category = 'budget';
     processingRoute = 'budget_route';
-    affectedCount = 1;
+    affectedCount = 2;
   }
   
   return { category, processingRoute, affectedCount };

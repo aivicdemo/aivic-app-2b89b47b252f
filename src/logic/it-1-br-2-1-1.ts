@@ -38,8 +38,7 @@ export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,
   applicationType: string,
-  applicantDepartment: string,
-  urgencyLevel: string
+  applicantDepartment: string
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
