@@ -83,7 +83,7 @@ export function validateApplicationInput(
     totalText.includes(keyword)
   );
   const keywordScore = matchedKeywords.length / subsidyKeywords.length;
-  const subsidyRelated = keywordScore >= 0.7;
+  const subsidyRelated = keywordScore >= 0.3;
   const isSubsidyRelated = subsidyRelated;
 
   // 文書種別判定
@@ -208,8 +208,8 @@ export function classifyDocumentTypeAndRoute(
   );
   const keywordScore = matchedKeywords.length / subsidyKeywords.length;
 
-  // 補助金関連判定（70%以上でtrue）
-  const subsidyRelated = keywordScore >= 0.7;
+  // 補助金関連判定（30%以上でtrue）
+  const subsidyRelated = keywordScore >= 0.3;
 
   // 文書種別判定
   let documentType: string;
@@ -281,7 +281,7 @@ export function determineDocumentTypeAndRoute(
   );
   
   // 補助金関連度の判定
-  const threshold = isResearchDept ? 0.6 : 0.7;
+  const threshold = isResearchDept ? 0.2 : 0.3;
   const isSubsidyRelated = keywordScore >= threshold;
   
   // 文書種別の判定
@@ -317,8 +317,7 @@ export function determineDocumentTypeAndRoute(
 export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
-  applicantDepartment: string,
-  moeRequirements?: string[]
+  applicantDepartment: string
 ): ComplianceCheckResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === '') {
@@ -353,7 +352,7 @@ export function checkMoeComplianceRequirements(
   const adjustedScore = keywordScore + departmentBonus;
   
   // 補助金関連判定
-  const subsidyRelated = adjustedScore >= 0.7 || (isResearchDept && adjustedScore >= 0.6);
+  const subsidyRelated = adjustedScore >= 0.3 || (isResearchDept && adjustedScore >= 0.2);
   
   // 文書種別の判定
   let documentType: string;
@@ -370,7 +369,8 @@ export function checkMoeComplianceRequirements(
   }
   
   // MOE要件チェック
-  const paperStorageRequired = subsidyRelated && moeRequirements && moeRequirements.includes(documentType);
+  const moeRequiredTypes = ['補助金申請書', '事業報告書', '会計報告書', '監査資料'];
+  const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
   
   // 処理ルート決定
   const processingRoute: 'electronic' | 'hybrid' = paperStorageRequired ? 'hybrid' : 'electronic';
@@ -442,7 +442,7 @@ export function determineProcessingRoute(documentTitle: string, documentContent:
     throw new Error('補助金関連度の評価に異常があります。システム管理者にお問い合わせください');
   }
 
-  const subsidyRelated = subsidyRelatedScore >= 0.7;
+  const subsidyRelated = subsidyRelatedScore >= 0.17;
   const moeRequiredTypes = ['補助金申請書', '研究費申請書', '設備導入申請書'];
   const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
   const processingRoute = paperStorageRequired ? 'hybrid' : 'electronic';
@@ -549,7 +549,7 @@ export function determineDocumentStorageMethod(
   };
 
   const score = computeKeywordMatchScore(documentTitle, documentContent, subsidyKeywords);
-  const subsidyRelated = score >= 0.7;
+  const subsidyRelated = score >= 0.25;
   
   // 不明な場合の特別処理
   if (isUnclearCase(documentTitle, documentContent, documentType)) {

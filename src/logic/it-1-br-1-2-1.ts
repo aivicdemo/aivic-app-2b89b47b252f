@@ -401,7 +401,8 @@ export function checkApprovalDelayAndNotify(
     delayStatus = "遅延";
   } else {
     for (const beforeDays of reminderSettings.beforeDays) {
-      if (hoursUntilDeadline <= beforeDays * 24 && hoursUntilDeadline > (beforeDays - 1) * 24) {
+      const beforeHours = beforeDays * 24;
+      if (hoursUntilDeadline <= beforeHours) {
         shouldNotify = true;
         notificationType = "事前催促";
         delayStatus = "注意";
