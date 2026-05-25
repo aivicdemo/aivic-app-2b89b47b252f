@@ -485,10 +485,10 @@ export function determineDigitalizationEligibility(
   const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書", "監査資料"];
   const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
   
-  // 判定基準が曖昧な場合は安全側でハイブリッド処理
+  // 判定基準が曖昧な場合は安全側で電子処理
   let processingRoute: 'electronic' | 'hybrid';
   if (documentType === "検討資料" || documentType === "その他") {
-    processingRoute = "hybrid";
+    processingRoute = "electronic";
   } else {
     processingRoute = paperStorageRequired ? "hybrid" : "electronic";
   }

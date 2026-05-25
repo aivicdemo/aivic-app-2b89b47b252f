@@ -27,8 +27,8 @@ export interface DocumentTypeAndRouteResult {
 }
 
 interface ValidateApplicationRequiredFields {
-  申請金額?: any;
-  実施期間?: any;
+  申請金額: any;
+  実施期間: any;
   [key: string]: any;
 }
 
@@ -281,7 +281,7 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: ClassificationRule[],
+  newClassificationRules: Array<{documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number}>,
   existingDocuments: Array<{id: string; document_type?: string; current_processing_route: string; title?: string; content?: string; documentType?: string}>,
   migrationScope: string
 ): MigrationResult & ValidationResult & RegulationImpactAnalysis & LegalChangeImpactResult {
@@ -308,7 +308,7 @@ export function migrateExistingDataToNewClassification(
     return true;
   };
 
-  const applyNewRulesInternal = (doc: any, rules: ClassificationRule[]): {processingRoute: string} => {
+  const applyNewRulesInternal = (doc: any, rules: Array<{documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number}>): {processingRoute: string} => {
     const matchingRule = rules.find(rule => rule.documentType === doc.document_type || rule.documentType === doc.documentType);
     if (matchingRule) {
       return { processingRoute: matchingRule.processingRoute };
