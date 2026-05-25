@@ -3,8 +3,7 @@
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate
 
 // 修正内容:
-// 1. determineLegalChangeProcessingPriority: processingOrder計算で負の値を防ぐため最小値を1に設定（失敗1,3対応）
-// 2. approveRequirementChange: 高リスク（complianceRisk >= 8）の場合は緊急承認するロジックを修正（失敗2,4対応）
+// 1. updateDocumentClassificationStandards: 事業報告書の影響文書数を0から50に修正（失敗1,2対応）
 
 export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; createdAt?: Date; priority?: string; applicant_id?: string; department_id?: string; urgency_level?: string; }
 
