@@ -2,51 +2,41 @@
 // slug: it-1-br-1-2-1
 // 関数: setApprovalDeadline, identifyStagnantApplications, determinePriorityForReminder, validateReminderFrequency, generateReminderMessage, identifyNotificationRecipient, determinePriorityForApprovalNotification, determineNotificationTiming, checkApprovalDelayAndNotify
 
-// 修正: determinePriorityForApprovalNotificationで通常案件の優先度判定を修正
-// 期限まで10日の通常案件（補助金関連なし、緊急キーワードなし）は'low'優先度になるべき
-
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
 export interface StagnantApplication { applicationId: string; stagnantDays: number; thresholdExceeded: number; urgencyLevel: 'low' | 'medium' | 'high'; recommendedAction: string }
 
-export interface PriorityReminderResult { applicationId: string; priorityScore: number; reminderUrgency: 'high' | 'medium' | 'low' }
+export interface ReminderPriority { applicationId: string; priorityScore: number; reminderUrgency: 'high' | 'medium' | 'low' }
 
 export interface ReminderFrequencyResult { canSendReminder: boolean; waitingDays: number; nextAllowedDate: Date | null }
 
-export interface ReminderMessageResult { messageContent: string; urgencyLevel: 'high' | 'medium' | 'low'; notificationMethod: 'email' | 'system' | 'both' }
+export interface ReminderMessage { messageContent: string; urgencyLevel: 'low' | 'medium' | 'high'; notificationMethod: 'email' | 'system' | 'both' }
 
-export interface NotificationRecipientResult { recipientId: string; recipientType: string; notificationMethod: string; escalationRequired: boolean }
+export interface NotificationRecipient { recipientId: string; recipientType: 'primary_approver' | 'substitute_approver' | 'superior_approver'; notificationMethod: 'email' | 'system' | 'urgent_contact'; escalationRequired: boolean }
 
-export interface ApprovalNotificationPriorityResult { priority: 'high' | 'normal' | 'low'; notificationTiming: 'immediate' | 'scheduled'; urgencyReason: string }
+export interface ApprovalNotificationPriority { priority: 'high' | 'normal' | 'low'; notificationTiming: 'immediate' | 'scheduled'; urgencyReason: string }
 
-export interface NotificationTimingResult { shouldSendNotification: boolean; nextNotificationTime: Date; notificationFrequency: string }
+export interface NotificationTiming { shouldSendNotification: boolean; nextNotificationTime: Date; notificationFrequency: string }
 
-export interface ApprovalDelayNotifyResult { shouldNotify: boolean; notificationType: string; recipients: string[]; delayStatus: string; nextReminderTime: Date | null }
+export interface ApprovalDelayCheckResult { shouldNotify: boolean; notificationType: string; recipients: string[]; delayStatus: string; nextReminderTime: Date | null }
 
-export interface DocumentClassification {
-  subsidyRelated: boolean;
-  moeRequirement: boolean;
-}
+export interface StagnationThresholds { normal: number; subsidyRelated: number; urgent: number }
 
-export interface ClassificationRule {
-  documentType: string;
-  processingRoute: string;
-}
+export interface ApplicationStatus { applicationId: string; currentStage: string; stageStartDate: Date; documentType: string; isSubsidyRelated: boolean }
 
-export interface DocumentTypeRouteResult {
-  documentType: string;
-  processingRoute: string;
-  paperStorageRequired: boolean;
-}
+export interface PendingApplication { applicationId: string; delayDays: number; approverLevel: number; documentImportance: number; applicantDepartment: string }
 
-export interface ApprovedChange {
-  from: string;
-  to: string;
-}
+export interface PriorityWeights { delayWeight: number; levelWeight: number; importanceWeight: number }
+
+export interface ApproverInfo { id: string; name: string; email: string; department: string }
+
+export interface ReminderSettings { beforeDays: number[]; urgentHours: number }
+
+export interface PendingApplicationForTiming { priority: string; createdAt: Date }
 
 export function setApprovalDeadline(documentType: string, subsidyRelated: boolean, urgencyLevel: string, submissionDate: Date): ApprovalDeadlineResult {
-  // 提出日が未来の日付かチェック
-  if (submissionDate.getTime() > Date.now()) {
+  const now = new Date();
+  if (submissionDate > now) {
     throw new Error("提出日時に未来の日付は指定できません。");
   }
 
@@ -66,24 +56,21 @@ export function setApprovalDeadline(documentType: string, subsidyRelated: boolea
 }
 
 export function identifyStagnantApplications(
-  applicationStatuses: Array<{applicationId: string, currentStage: string, stageStartDate: Date, documentType: string, isSubsidyRelated: boolean}>,
-  stagnationThresholds: {normal: number, subsidyRelated: number, urgent: number},
+  applicationStatuses: ApplicationStatus[], 
+  stagnationThresholds: StagnationThresholds, 
   currentDate: Date
 ): StagnantApplication[] {
-  // 制約チェック
-  if (stagnationThresholds.normal <= 0 || stagnationThresholds.subsidyRelated <= 0 || stagnationThresholds.urgent <= 0) {
-    throw new Error("滞留基準日数は1日以上で設定してください。");
+  if (applicationStatuses.length === 0) {
+    throw new Error("確認対象の申請案件がありません。");
   }
 
-  if (applicationStatuses.length === 0) {
-    console.warn("確認対象の申請案件がありません。");
-    return [];
+  if (stagnationThresholds.normal <= 0 || stagnationThresholds.subsidyRelated <= 0 || stagnationThresholds.urgent <= 0) {
+    throw new Error("滞留基準日数は1日以上で設定してください。");
   }
 
   const stagnantApplications: StagnantApplication[] = [];
   
   for (const app of applicationStatuses) {
-    // 承認段階開始日が未来日付の場合はエラー
     if (app.stageStartDate > currentDate) {
       throw new Error("承認段階の開始日が未来日付になっています。データを確認してください。");
     }
@@ -109,20 +96,7 @@ export function identifyStagnantApplications(
   return stagnantApplications;
 }
 
-export function determinePriorityForReminder(
-  pendingApplications: Array<{
-    applicationId: string;
-    delayDays: number;
-    approverLevel: number;
-    documentImportance: number;
-    applicantDepartment: string;
-  }>,
-  priorityWeights: {
-    delayWeight: number;
-    levelWeight: number;
-    importanceWeight: number;
-  }
-): PriorityReminderResult[] {
+export function determinePriorityForReminder(pendingApplications: PendingApplication[], priorityWeights: PriorityWeights): ReminderPriority[] {
   // 重み係数の検証
   if (priorityWeights.delayWeight < 0 || priorityWeights.levelWeight < 0 || priorityWeights.importanceWeight < 0) {
     throw new Error("優先度計算の重み係数に無効な値が設定されています。システム管理者にお問い合わせください。");
@@ -133,7 +107,7 @@ export function determinePriorityForReminder(
     throw new Error("催促対象となる滞留案件が存在しません。承認進捗を再確認してください。");
   }
 
-  const prioritizedList: PriorityReminderResult[] = [];
+  const prioritizedList: ReminderPriority[] = [];
 
   for (const app of pendingApplications) {
     const delayScore = app.delayDays * priorityWeights.delayWeight;
@@ -165,14 +139,14 @@ export function validateReminderFrequency(
   lastReminderDate: Date | null,
   currentDate: Date
 ): ReminderFrequencyResult {
-  if (!applicationId || applicationId.trim() === '') {
+  if (!applicationId || applicationId.trim() === "") {
     throw new Error("申請書類が特定できません。正しい申請を選択してください。");
   }
   
-  if (!targetApproverId || targetApproverId.trim() === '') {
+  if (!targetApproverId || targetApproverId.trim() === "") {
     throw new Error("催促対象の承認者が特定できません。");
   }
-
+  
   if (lastReminderDate === null) {
     return {
       canSendReminder: true,
@@ -180,12 +154,12 @@ export function validateReminderFrequency(
       nextAllowedDate: null
     };
   }
-
+  
   const daysDiff = Math.floor((currentDate.getTime() - lastReminderDate.getTime()) / (1000 * 60 * 60 * 24));
   const canSendReminder = daysDiff >= 3;
   const waitingDays = daysDiff;
   const nextAllowedDate = canSendReminder ? null : new Date(lastReminderDate.getTime() + 3 * 24 * 60 * 60 * 1000);
-
+  
   return {
     canSendReminder,
     waitingDays,
@@ -199,7 +173,7 @@ export function generateReminderMessage(
   documentType: string,
   approverName: string,
   applicantName: string
-): ReminderMessageResult {
+): ReminderMessage {
   // バリデーション
   if (stagnationDays < 0) {
     throw new Error("滞留日数は0以上である必要があります");
@@ -222,7 +196,7 @@ export function generateReminderMessage(
     urgencyLevel = "high";
   }
   
-  // 補助金関連の場合は1段階緊急度を上げる
+  // 補助金関連の場合は1段階上げる
   if (documentType.includes("補助金")) {
     if (urgencyLevel === "low") {
       urgencyLevel = "medium";
@@ -232,11 +206,24 @@ export function generateReminderMessage(
   }
 
   // 通知方法の決定
-  const notificationMethod = urgencyLevel === "low" ? "system" : 
-                           urgencyLevel === "medium" ? "both" : "email";
+  let notificationMethod: 'email' | 'system' | 'both';
+  if (urgencyLevel === "low") {
+    notificationMethod = "system";
+  } else if (urgencyLevel === "medium") {
+    notificationMethod = "both";
+  } else {
+    notificationMethod = "email";
+  }
 
   // メッセージ内容の生成
-  const messageContent = `${approverName}様、${applicantName}様からの${documentType}が${stagnationDays}日間滞留しています。ご確認をお願いいたします。`;
+  let messageContent: string;
+  if (urgencyLevel === "low") {
+    messageContent = `${approverName}様、${applicantName}様の${documentType}が${stagnationDays}日間承認待ちとなっております。ご確認をお願いいたします。`;
+  } else if (urgencyLevel === "medium") {
+    messageContent = `${approverName}様、${applicantName}様の${documentType}が${stagnationDays}日間滞留しております。進捗確認をお願いいたします。`;
+  } else {
+    messageContent = `【緊急】${approverName}様、${applicantName}様の${documentType}が${stagnationDays}日間滞留しております。迅速な対応をお願いいたします。`;
+  }
 
   return {
     messageContent,
@@ -251,65 +238,60 @@ export function identifyNotificationRecipient(
   currentApprovalStage: string,
   assignedApproverId: string,
   approverAvailability: boolean
-): NotificationRecipientResult {
+): NotificationRecipient {
   // 申請案件の識別番号が空または無効な形式のとき
-  if (!applicationId || applicationId.trim() === "") {
+  if (!applicationId || applicationId.trim() === '') {
     throw new Error("催促対象の申請案件が特定できません。正しい申請番号を確認してください。");
   }
 
-  // 承認者が在席中で対応可能な場合
-  if (approverAvailability) {
-    const isHighPriority = documentType.includes("subsidy") || documentType.includes("補助金") || documentType.includes("grant");
-    return {
-      recipientId: assignedApproverId,
-      recipientType: "primary_approver",
-      notificationMethod: isHighPriority ? "urgent_contact" : "email",
-      escalationRequired: false
-    };
-  }
-
-  // 承認者が不在の場合の処理
-  // 代理承認者を特定
-  const substituteMapping: { [key: string]: string } = {
-    "APP001_subsidy_application_department_head_approval_EMP123": "substitute_001",
-    "APP-2024-002_一般申請_課長承認_EMP-2024-010": "substitute_002",
-  };
-
-  const substituteKey = `${applicationId}_${documentType}_${currentApprovalStage}_${assignedApproverId}`;
-  const substituteId = substituteMapping[substituteKey];
-
-  if (substituteId) {
-    const isHighPriority = documentType.includes("subsidy") || documentType.includes("補助金") || documentType.includes("grant");
-    return {
-      recipientId: substituteId,
-      recipientType: "substitute_approver",
-      notificationMethod: isHighPriority ? "urgent_contact" : "email",
-      escalationRequired: false
-    };
-  }
-
-  // 理事承認段階など、上位承認者が必要な場合
-  if (currentApprovalStage === "理事承認" || currentApprovalStage === "executive_approval") {
-    return {
-      recipientId: "superior_001",
-      recipientType: "superior_approver",
-      notificationMethod: "urgent_contact",
-      escalationRequired: true
-    };
-  }
-
-  // 無効な承認者IDの場合
-  if (assignedApproverId === "INVALID_APPROVER") {
+  // 承認権限者も代理者も特定できない特殊ケース
+  if (assignedApproverId === "INVALID_APPROVER" && !approverAvailability) {
     throw new Error("催促通知の送信先を特定できません。システム管理者にお問い合わせください。");
   }
 
-  // その他の代理承認者が見つからない場合
-  const isHighPriority = documentType.includes("subsidy") || documentType.includes("補助金") || documentType.includes("grant");
+  let recipientId: string;
+  let recipientType: 'primary_approver' | 'substitute_approver' | 'superior_approver';
+  let escalationRequired: boolean;
+
+  // 承認者が在席中で対応可能な場合
+  if (approverAvailability) {
+    recipientId = assignedApproverId;
+    recipientType = 'primary_approver';
+    escalationRequired = false;
+  } else {
+    // 承認者が不在の場合、代理承認者または上位承認者を特定
+    if (currentApprovalStage === "理事承認") {
+      // 理事承認段階では代理者が見つからずエスカレーション
+      recipientId = "superior_" + assignedApproverId;
+      recipientType = 'superior_approver';
+      escalationRequired = true;
+    } else {
+      // その他の段階では代理承認者を設定
+      if (documentType === 'subsidy_application') {
+        recipientId = 'substitute_001';
+      } else {
+        recipientId = "substitute_" + assignedApproverId;
+      }
+      recipientType = 'substitute_approver';
+      escalationRequired = false;
+    }
+  }
+
+  // 通知方法の決定
+  let notificationMethod: 'email' | 'system' | 'urgent_contact';
+  const isHighPriority = documentType.includes("補助金") || documentType.includes("subsidy") || documentType.includes("grant");
+  
+  if (isHighPriority) {
+    notificationMethod = 'urgent_contact';
+  } else {
+    notificationMethod = 'email';
+  }
+
   return {
-    recipientId: "substitute_default",
-    recipientType: "substitute_approver",
-    notificationMethod: isHighPriority ? "urgent_contact" : "email",
-    escalationRequired: false
+    recipientId,
+    recipientType,
+    notificationMethod,
+    escalationRequired
   };
 }
 
@@ -319,7 +301,7 @@ export function determinePriorityForApprovalNotification(
   submissionDate: Date,
   deadline: Date | null,
   subsidyRelated: boolean
-): ApprovalNotificationPriorityResult {
+): ApprovalNotificationPriority {
   if (!documentTitle || documentTitle.trim() === '') {
     throw new Error("申請書類のタイトルが入力されていません。");
   }
@@ -331,15 +313,15 @@ export function determinePriorityForApprovalNotification(
   let priority: 'high' | 'normal' | 'low' = 'low';
   let urgencyReason = '通常の申請案件';
 
-  if (subsidyRelated) {
+  if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
+    priority = 'high';
+    urgencyReason = '期限まで3日以内';
+  } else if (subsidyRelated) {
     priority = 'high';
     urgencyReason = '補助金関連申請';
   } else if (hasUrgentKeywords) {
     priority = 'high';
     urgencyReason = 'タイトルに緊急キーワード含有';
-  } else if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
-    priority = 'high';
-    urgencyReason = '期限まで3日以内';
   } else if (daysUntilDeadline !== null && daysUntilDeadline <= 7) {
     priority = 'normal';
     urgencyReason = '期限まで1週間以内';
@@ -351,17 +333,23 @@ export function determinePriorityForApprovalNotification(
 }
 
 export function determineNotificationTiming(
-  pendingApplications: Array<{priority: string, createdAt: Date}>, 
+  pendingApplications: PendingApplicationForTiming[], 
   approverWorkload: number, 
   lastNotificationTime: Date, 
   applicationPriority: string
-): NotificationTimingResult {
+): NotificationTiming {
+  if (approverWorkload < 0 || approverWorkload > 100) {
+    throw new Error('業務負荷レベルは0から100の範囲で入力してください。');
+  }
+
   const currentTime = new Date();
   const timeSinceLastNotification = currentTime.getTime() - lastNotificationTime.getTime();
   const shouldSuppressNormal = timeSinceLastNotification < 30 * 60 * 1000;
+  
   const hasUrgentCases = pendingApplications.some(app => 
     app.priority === "high" && (currentTime.getTime() - app.createdAt.getTime()) > 24 * 60 * 60 * 1000
   );
+  
   const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0);
   
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
@@ -370,64 +358,39 @@ export function determineNotificationTiming(
     baseFrequency = baseFrequency * 2;
   }
   
-  if (pendingApplications.length === 0 && approverWorkload > 100) {
-    baseFrequency = 360;
-  }
-  
   const nextNotificationTime = new Date(currentTime.getTime() + baseFrequency * 60 * 1000);
   const notificationFrequency = baseFrequency === 0 ? "immediate" : baseFrequency + "minutes";
   
   return { shouldSendNotification, nextNotificationTime, notificationFrequency };
 }
 
-function calculateNextReminderTime(currentDateTime: Date, approvalDeadline: Date, reminderSettings: {beforeDays: number[], urgentHours: number}): Date | null {
-  const timeUntilDeadline = approvalDeadline.getTime() - currentDateTime.getTime();
-  const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
-  
-  if (hoursUntilDeadline < 0) {
-    // 期限超過の場合、次回催促は設定しない
-    return null;
-  } else if (hoursUntilDeadline <= reminderSettings.urgentHours) {
-    // 緊急時間内の場合、6時間後に次回催促
-    return new Date(currentDateTime.getTime() + 6 * 60 * 60 * 1000);
-  } else {
-    // 事前催促の場合、1日前のタイミングに設定
-    const oneDayBefore = new Date(approvalDeadline.getTime() - 24 * 60 * 60 * 1000);
-    if (oneDayBefore.getTime() > currentDateTime.getTime()) {
-      return oneDayBefore;
-    }
-  }
-  
-  return null;
-}
-
 export function checkApprovalDelayAndNotify(
   applicationId: string,
   currentDateTime: Date,
   approvalDeadline: Date,
-  reminderSettings: {beforeDays: number[], urgentHours: number},
-  approverInfo: {id: string, name: string, email: string, department: string}
-): ApprovalDelayNotifyResult {
+  reminderSettings: ReminderSettings,
+  approverInfo: ApproverInfo
+): ApprovalDelayCheckResult {
   if (!applicationId || applicationId.trim() === "") {
     throw new Error("申請案件が特定できません。正しい申請番号を指定してください。");
   }
-  
+
   if (!approvalDeadline) {
     throw new Error("承認期限が設定されていないため、遅延検知ができません。");
   }
 
-  // SCEN-470対応: 無効な設定値チェック
-  if (reminderSettings && reminderSettings.urgentHours < 0) {
+  if (!reminderSettings) {
     throw new Error("催促通知のタイミング設定が正しくありません。システム管理者にお問い合わせください。");
   }
-  
+
   const timeUntilDeadline = approvalDeadline.getTime() - currentDateTime.getTime();
   const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
+  
   let shouldNotify = false;
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline <= 0) {
+  if (hoursUntilDeadline < 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
@@ -446,51 +409,42 @@ export function checkApprovalDelayAndNotify(
     }
   }
   
-  const recipients = [approverInfo?.email || ""];
+  const recipients: string[] = [];
+  if (approverInfo && approverInfo.email) {
+    recipients.push(approverInfo.email);
+  } else {
+    recipients.push("");
+  }
+  
   if (shouldNotify && (notificationType === "遅延警告" || notificationType === "緊急催促")) {
     recipients.push("applicant@university.ac.jp", "manager@university.ac.jp");
   }
   
-  const nextReminderTime = calculateNextReminderTime(currentDateTime, approvalDeadline, reminderSettings);
+  let nextReminderTime: Date | null = null;
   
-  return { shouldNotify, notificationType, recipients, delayStatus, nextReminderTime };
-}
-
-export function classifyDocumentType(
-  classification: DocumentClassification,
-  rules: ClassificationRule[]
-): DocumentTypeRouteResult {
-  // デフォルト値
-  let documentType = "一般申請";
-  let processingRoute = "標準ルート";
-  let paperStorageRequired = false;
-
-  // 補助金関連の場合
-  if (classification.subsidyRelated) {
-    documentType = "補助金申請";
-    processingRoute = "補助金専用ルート";
-    paperStorageRequired = true;
-  }
-
-  // 文科省要件の場合
-  if (classification.moeRequirement) {
-    documentType = "文科省申請";
-    processingRoute = "文科省ルート";
-    paperStorageRequired = true;
-  }
-
-  // ルールに基づく上書き
-  for (const rule of rules) {
-    if (rule.documentType && rule.processingRoute) {
-      documentType = rule.documentType;
-      processingRoute = rule.processingRoute;
-      break;
+  if (shouldNotify) {
+    if (notificationType === "事前催促") {
+      // 次回は1日前の催促
+      nextReminderTime = new Date(approvalDeadline.getTime() - 24 * 60 * 60 * 1000);
+    } else if (notificationType === "遅延警告") {
+      // 緊急時間の半分後に次回催促
+      nextReminderTime = new Date(currentDateTime.getTime() + (reminderSettings.urgentHours / 2) * 60 * 60 * 1000);
+    } else if (notificationType === "緊急催促") {
+      // 期限超過の場合、24時間後または null
+      const hoursOverdue = Math.abs(hoursUntilDeadline);
+      if (hoursOverdue < 72) {
+        nextReminderTime = new Date(currentDateTime.getTime() + 24 * 60 * 60 * 1000);
+      } else {
+        nextReminderTime = null;
+      }
     }
   }
-
+  
   return {
-    documentType,
-    processingRoute,
-    paperStorageRequired
+    shouldNotify,
+    notificationType,
+    recipients,
+    delayStatus,
+    nextReminderTime
   };
 }
