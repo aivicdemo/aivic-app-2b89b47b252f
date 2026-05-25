@@ -128,7 +128,7 @@ export function validateApplicationInput(
     totalText.includes(keyword)
   );
   const keywordScore = matchedKeywords.length / subsidyKeywords.length;
-  const subsidyRelated = keywordScore >= 0.7;
+  const subsidyRelated = keywordScore >= 0.3; // 補助金申請の場合は低い閾値で判定
 
   // 処理ルートと保管方式の決定
   const paperStorageRequired = subsidyRelated && (
@@ -141,7 +141,7 @@ export function validateApplicationInput(
   // 文書種別の判定
   let documentType: string;
   if (subsidyRelated) {
-    documentType = documentTitle.includes('申請') ? '補助金申請' : '補助金申請';
+    documentType = '補助金申請';
   } else {
     documentType = '一般申請';
   }
@@ -318,7 +318,7 @@ export function determineDocumentTypeAndRoute(
   let documentType: string;
   if (isSubsidyRelated) {
     if (documentTitle.includes('申請書') || documentTitle.includes('申請')) {
-      documentType = '補助金申請';
+      documentType = '補助金申請書';
     } else {
       documentType = '補助金申請';
     }

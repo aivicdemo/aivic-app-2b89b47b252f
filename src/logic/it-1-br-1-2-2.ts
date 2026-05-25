@@ -1,37 +1,29 @@
-export interface NotificationPriorityResult {
-  priority: string;
-  notificationTiming: string;
-  urgencyReason: string;
+export interface SystemFailureFallbackResult {
+  fallbackMethod: string;
+  emergencyContactList: string[];
+  paperFormUrl: string;
+  syncRequired: boolean;
 }
 
-export function determineNotificationPriority(
+export function handleSystemFailureFallback(
+  systemStatus: string,
   applicationId: string,
-  delayDays: number,
-  applicationAmount: number,
-  applicationType: string
-): NotificationPriorityResult {
-  // 通常案件の判定条件
-  if (delayDays <= 3 && applicationAmount <= 100000 && applicationType === "通常申請") {
+  userRole: string
+): SystemFailureFallbackResult {
+  if (systemStatus === 'data_inconsistency_detected') {
     return {
-      priority: "low",
-      notificationTiming: "scheduled",
-      urgencyReason: "通常の申請案件"
+      fallbackMethod: 'temporary_workaround',
+      emergencyContactList: ['relevant_staff', 'it_support'],
+      paperFormUrl: `http://emergency-forms.university.ac.jp/paper/${applicationId}`,
+      syncRequired: true
     };
   }
-  
-  // 緊急案件の判定
-  if (delayDays > 7 || applicationAmount > 500000) {
-    return {
-      priority: "high",
-      notificationTiming: "immediate",
-      urgencyReason: "高額または長期滞留案件"
-    };
-  }
-  
-  // 中程度の優先度
+
+  // 通常の障害時は紙ベース代替手段
   return {
-    priority: "medium",
-    notificationTiming: "daily",
-    urgencyReason: "標準的な催促案件"
+    fallbackMethod: 'emergency_paper',
+    emergencyContactList: ['contact1@university.ac.jp', 'contact2@university.ac.jp'],
+    paperFormUrl: `https://system.university.ac.jp/forms/${applicationId}.pdf`,
+    syncRequired: true
   };
 }
