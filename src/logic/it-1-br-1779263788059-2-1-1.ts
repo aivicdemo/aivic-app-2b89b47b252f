@@ -43,7 +43,7 @@ export function classifyDocumentTypeAndRoute(
                              documentContent.includes("申請");
 
   let documentType = "一般申請書";
-  let processingRoute = "electronic";
+  let processingRoute: string = "electronic";
   let paperStorageRequired = false;
 
   if (isSubsidyRelated) {

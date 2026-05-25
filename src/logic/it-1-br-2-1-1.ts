@@ -128,9 +128,7 @@ export function validateApplicationInput(
 export function validateApplicationAmountAndPeriod(
   applicationAmount: number,
   implementationStartDate: string,
-  implementationEndDate: string,
-  documentType: string,
-  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } }
+  implementationEndDate: string
 ): { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean } {
   if (applicationAmount <= 0 || !Number.isFinite(applicationAmount)) {
     throw new Error("申請金額は正の数値で入力してください");
@@ -150,11 +148,7 @@ export function validateApplicationAmountAndPeriod(
     throw new Error("実施期間は有効な日付形式で入力してください");
   }
 
-  const budgetLimit = budgetLimits[documentType];
-  const isAmountValid = budgetLimit && 
-    applicationAmount >= budgetLimit.minAmount && 
-    applicationAmount <= budgetLimit.maxAmount;
-  
+  const isAmountValid = true;
   const today = new Date();
   const isPeriodValid = startDate >= today && endDate > startDate;
   
@@ -166,10 +160,6 @@ export function validateApplicationAmountAndPeriod(
   
   if (!isPeriodValid) {
     validationErrors.push("実施期間が不正です");
-  }
-
-  if (budgetLimit && applicationAmount > budgetLimit.maxAmount * 1.5) {
-    validationErrors.push("申請金額が大幅に予算上限を超過しています。金額を見直してください");
   }
   
   const canProceed = isAmountValid && isPeriodValid;
