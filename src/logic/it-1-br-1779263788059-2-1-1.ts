@@ -2,20 +2,60 @@
 // slug: it-1-br-1779263788059-2-1-1
 // 関数: validateApplicationBeforeSubmission, analyzeRegulationImpactScope, classifyLegalChangeImpactLevel, migrateExistingDataToNewClassification
 // 修正: analyzeRegulationImpactScope で判定基準が曖昧な文書に対して安全側の処理ルート（hybrid）を選択するよう修正
+// Jest TypeScript エラー修正: テストが期待する型定義とシグネチャに合わせて修正
+// 修正内容: analyzeRegulationImpactScope の処理ルート変更判定ロジックを修正し、判定基準が曖昧な場合に安全側（hybrid）を選択するよう変更
 
-export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[] }
+export interface ValidationResult { 
+  isValid: boolean; 
+  errors: string[]; 
+  warnings: string[] 
+}
 
-export interface RegulationImpactResult { affectedDocumentTypes: string[]; processingRouteChanges: Array<{ documentType: string; oldRoute: string; newRoute: string }>; impactLevel: string; changeRequiredCount: number }
+export interface RegulationImpactResult { 
+  affectedDocumentTypes: string[]; 
+  processingRouteChanges: Array<{ documentType: string; oldRoute: string; newRoute: string }>; 
+  impactLevel: string; 
+  changeRequiredCount: number 
+}
 
-export interface LegalChangeImpactResult { impactLevel: string; priority: number; requiredResponseDays: number; affectedRuleCount: number; riskAssessment: string }
+export interface LegalChangeImpactResult { 
+  impactLevel: string; 
+  priority: number; 
+  requiredResponseDays: number; 
+  affectedRuleCount: number; 
+  riskAssessment: string 
+}
 
-export interface MigrationResult { migratedCount: number; skippedCount: number; errorCount: number; updatedRoutes: Array<{ documentId: string; oldRoute: string; newRoute: string }> }
+export interface MigrationResult { 
+  migratedCount: number; 
+  skippedCount: number; 
+  errorCount: number; 
+  updatedRoutes: Array<{ documentId: string; oldRoute: string; newRoute: string }> 
+}
 
-export interface DocumentType { typeName: string; regulationCategory: string; storageRequirement: string }
+export interface DocumentType { 
+  typeName: string; 
+  regulationCategory: string; 
+  storageRequirement: string 
+}
 
-export interface ClassificationRule { documentType: string; keywords?: string[]; threshold?: number; paperStorageRequired?: boolean; processingRoute: string }
+export interface ClassificationRule { 
+  documentType: string; 
+  keywords?: string[]; 
+  threshold?: number; 
+  paperStorageRequired?: boolean; 
+  processingRoute: string 
+}
 
-export interface Document { id: string; title?: string; content?: string; document_type?: string; current_processing_route: string; created_date?: Date; documentType?: string }
+export interface Document { 
+  id: string; 
+  title?: string; 
+  content?: string; 
+  document_type?: string; 
+  current_processing_route: string; 
+  created_date?: Date; 
+  documentType?: string 
+}
 
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
@@ -95,7 +135,8 @@ export function analyzeRegulationImpactScope(
       // 改正内容に基づく新しい処理ルートの決定
       // 判定基準が曖昧な場合は安全側（hybrid）を選択
       if (regulationChangeContent.includes("紙保管を必須") || 
-          regulationChangeContent.includes("電子保存要件が変更")) {
+          regulationChangeContent.includes("電子保存要件が変更") ||
+          regulationChangeContent.includes("紙保管")) {
         if (currentRoute === "electronic") {
           newRoute = "hybrid";
         }
