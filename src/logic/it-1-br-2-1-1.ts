@@ -318,7 +318,7 @@ export function determineDocumentTypeAndRoute(
   let documentType: string;
   if (isSubsidyRelated) {
     if (documentTitle.includes('申請書') || documentTitle.includes('申請')) {
-      documentType = '補助金申請書';
+      documentType = '補助金申請';
     } else {
       documentType = '補助金申請';
     }
@@ -411,7 +411,7 @@ export function checkMoeComplianceRequirements(
   
   // リスクレベルの判定
   let riskLevel: string;
-  if (keywordScore >= 0.8) {
+  if (keywordScore >= 0.9) {
     riskLevel = 'high';
   } else if (keywordScore >= 0.4) {
     riskLevel = 'medium';
