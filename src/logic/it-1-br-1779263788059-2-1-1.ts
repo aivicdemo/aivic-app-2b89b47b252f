@@ -36,8 +36,8 @@ export interface ChangeRequirement {
 }
 
 interface ValidateApplicationRequiredFields {
-  申請金額: any;
   実施期間: any;
+  申請金額: any;
   [key: string]: any;
 }
 
