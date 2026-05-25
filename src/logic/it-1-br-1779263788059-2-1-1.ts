@@ -26,6 +26,58 @@ export interface DocumentTypeAndRouteResult {
   paperStorageRequired: boolean;
 }
 
+export function classifyDocumentTypeAndRoute(
+  documentTitle: string,
+  documentContent: string,
+  classificationRules: ClassificationRule[]
+): DocumentTypeAndRouteResult {
+  // 補助金関連キーワードの検出
+  const subsidyKeywords = ["補助金", "助成金", "科研費", "文部科学省", "研究費"];
+  const isSubsidyRelated = subsidyKeywords.some(keyword => 
+    documentTitle.includes(keyword) || documentContent.includes(keyword)
+  );
+
+  // 判定基準が曖昧な場合は安全側（hybrid）を選択
+  const hasAmbiguousContent = documentTitle.includes("設備") || 
+                             documentContent.includes("研究") ||
+                             documentContent.includes("申請");
+
+  let documentType = "一般申請書";
+  let processingRoute = "electronic";
+  let paperStorageRequired = false;
+
+  if (isSubsidyRelated) {
+    documentType = "補助金申請書";
+    processingRoute = "hybrid";
+    paperStorageRequired = true;
+  } else if (hasAmbiguousContent) {
+    // 判定基準が曖昧な文書では安全側の処理ルート（hybrid）を選択
+    processingRoute = "hybrid";
+    paperStorageRequired = true;
+  }
+
+  // 分類ルールが提供されている場合はそれを適用
+  for (const rule of classificationRules) {
+    if (rule.keywords) {
+      const matchesKeywords = rule.keywords.some(keyword =>
+        documentTitle.includes(keyword) || documentContent.includes(keyword)
+      );
+      if (matchesKeywords) {
+        documentType = rule.documentType;
+        processingRoute = rule.processingRoute;
+        paperStorageRequired = rule.paperStorageRequired || false;
+        break;
+      }
+    }
+  }
+
+  return {
+    documentType,
+    processingRoute,
+    paperStorageRequired
+  };
+}
+
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
   documentContent: string,
@@ -224,7 +276,7 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: Array<{documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number}>,
+  newClassificationRules: ClassificationRule[],
   existingDocuments: Array<{id: string; document_type?: string; current_processing_route: string}>,
   migrationScope: string
 ): MigrationResult {
@@ -245,7 +297,7 @@ export function migrateExistingDataToNewClassification(
     return true;
   };
 
-  const applyNewRulesInternal = (doc: {id: string; document_type?: string; current_processing_route: string}, rules: Array<{documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number}>): {processingRoute: string} => {
+  const applyNewRulesInternal = (doc: {id: string; document_type?: string; current_processing_route: string}, rules: ClassificationRule[]): {processingRoute: string} => {
     const matchingRule = rules.find(rule => rule.documentType === doc.document_type);
     if (matchingRule) {
       return { processingRoute: matchingRule.processingRoute };

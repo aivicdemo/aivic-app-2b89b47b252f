@@ -90,7 +90,7 @@ export function validateApplicationInput(
   let documentType: string;
   if (subsidyRelated) {
     if (documentTitle.includes("申請")) {
-      documentType = "補助金申請書";
+      documentType = "補助金申請";
     } else {
       documentType = "補助金申請";
     }
