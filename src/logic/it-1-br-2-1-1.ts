@@ -31,7 +31,7 @@ export interface ValidateApplicationRequiredFields {
   amount?: string; 
 }
 
-export interface ProcessingRouteUpdate { documentType: string; processingRoute?: string; oldRoute?: string; newRoute?: string; from?: any; to?: any; }
+export interface ProcessingRouteUpdate { documentType: string; processingRoute?: string; from?: any; to?: any; }
 
 export interface ChangeRequirement { documentType: string; from: any; to: any; }
 
@@ -40,7 +40,7 @@ export function validateApplicationInput(
   documentContent: string,
   applicationType: string,
   applicantDepartment: string,
-  urgencyLevel: string,
+  urgencyLevel?: string,
   classificationRules?: ClassificationRule[],
   requiredFields?: ValidateApplicationRequiredFields
 ): ValidationResult {
@@ -86,8 +86,8 @@ export function validateApplicationAmountAndPeriod(
   applicationAmount: number,
   implementationStartDate: string,
   implementationEndDate: string,
-  documentType: string,
-  budgetLimits: { [key: string]: { minAmount: number; maxAmount: number } },
+  documentType?: string,
+  budgetLimits?: { [key: string]: { minAmount: number; maxAmount: number } },
   classificationRules?: ClassificationRule[],
   requiredFields?: ValidateApplicationRequiredFields
 ): { isAmountValid: boolean; isPeriodValid: boolean; validationErrors: string[]; canProceed: boolean } {
@@ -103,11 +103,16 @@ export function validateApplicationAmountAndPeriod(
     throw new Error("実施期間は有効な日付形式で入力してください");
   }
 
-  const budgetLimit = budgetLimits[documentType];
+  const defaultBudgetLimits = {
+    default: { minAmount: 0, maxAmount: 10000000 }
+  };
+  const limits = budgetLimits || defaultBudgetLimits;
+  const budgetLimit = limits[documentType || 'default'] || limits['default'];
+  
   const isAmountValid = applicationAmount >= budgetLimit.minAmount && applicationAmount <= budgetLimit.maxAmount;
   
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // 日付のみで比較
+  today.setHours(0, 0, 0, 0);
   startDate.setHours(0, 0, 0, 0);
   endDate.setHours(0, 0, 0, 0);
   
@@ -123,7 +128,6 @@ export function validateApplicationAmountAndPeriod(
     validationErrors.push("実施期間が不正です");
   }
 
-  // 予算上限の150%超過チェック（警告）
   if (applicationAmount > budgetLimit.maxAmount * 1.5) {
     validationErrors.push("申請金額が大幅に予算上限を超過しています。金額を見直してください");
   }
@@ -337,7 +341,7 @@ export function checkMoeComplianceRequirements(
   
   // リスクレベル - 修正: 高い関連度の場合にhighを返すよう調整
   let riskLevel: string;
-  if (adjustedScore >= 0.8) {
+  if (adjustedScore >= 0.7) {
     riskLevel = 'high';
   } else if (adjustedScore >= 0.4) {
     riskLevel = 'medium';
@@ -389,7 +393,7 @@ export function determineProcessingRoute(
   documentType: string, 
   subsidyRelated: boolean, 
   paperStorageRequired: boolean, 
-  applicantDepartment: string, 
+  applicantDepartment?: string, 
   budgetAmount?: number,
   classificationRules?: ClassificationRule[]
 ): ProcessingRouteResult {
@@ -408,7 +412,7 @@ export function handleDocumentClassificationException(
   documentContent: string,
   autoClassificationResult: string | null,
   staffObjection: string | null,
-  managerDecision: string,
+  managerDecision?: string,
   classificationRules?: ClassificationRule[]
 ): ExceptionHandlingResult {
   if (!documentTitle) {
