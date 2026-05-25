@@ -23,6 +23,22 @@ export interface NotificationTimingResult { shouldSendNotification: boolean; nex
 
 export interface ApprovalDelayNotifyResult { shouldNotify: boolean; notificationType: string; recipients: string[]; delayStatus: string; nextReminderTime: Date | null }
 
+export interface DocumentClassification {
+  subsidyRelated: boolean;
+  moeRequirement: boolean;
+}
+
+export interface ClassificationRule {
+  documentType: string;
+  processingRoute: string;
+}
+
+export interface DocumentTypeRouteResult {
+  documentType: string;
+  processingRoute: string;
+  paperStorageRequired: boolean;
+}
+
 export function setApprovalDeadline(documentType: string, subsidyRelated: boolean, urgencyLevel: string, submissionDate: Date): ApprovalDeadlineResult {
   // 提出日が未来の日付かチェック
   if (submissionDate.getTime() > Date.now()) {
@@ -394,6 +410,11 @@ export function checkApprovalDelayAndNotify(
   if (!approvalDeadline) {
     throw new Error("承認期限が設定されていないため、遅延検知ができません。");
   }
+
+  // SCEN-470対応: 無効な設定値チェック
+  if (reminderSettings && reminderSettings.urgentHours < 0) {
+    throw new Error("催促通知のタイミング設定が正しくありません。システム管理者にお問い合わせください。");
+  }
   
   const timeUntilDeadline = approvalDeadline.getTime() - currentDateTime.getTime();
   const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
@@ -428,4 +449,43 @@ export function checkApprovalDelayAndNotify(
   const nextReminderTime = calculateNextReminderTime(currentDateTime, approvalDeadline, reminderSettings);
   
   return { shouldNotify, notificationType, recipients, delayStatus, nextReminderTime };
+}
+
+export function classifyDocumentType(
+  classification: DocumentClassification,
+  rules: ClassificationRule[]
+): DocumentTypeRouteResult {
+  // デフォルト値
+  let documentType = "一般申請";
+  let processingRoute = "標準ルート";
+  let paperStorageRequired = false;
+
+  // 補助金関連の場合
+  if (classification.subsidyRelated) {
+    documentType = "補助金申請";
+    processingRoute = "補助金専用ルート";
+    paperStorageRequired = true;
+  }
+
+  // 文科省要件の場合
+  if (classification.moeRequirement) {
+    documentType = "文科省申請";
+    processingRoute = "文科省ルート";
+    paperStorageRequired = true;
+  }
+
+  // ルールに基づく上書き
+  for (const rule of rules) {
+    if (rule.documentType && rule.processingRoute) {
+      documentType = rule.documentType;
+      processingRoute = rule.processingRoute;
+      break;
+    }
+  }
+
+  return {
+    documentType,
+    processingRoute,
+    paperStorageRequired
+  };
 }
