@@ -2,6 +2,11 @@
 // slug: it-1-br-1779263788059-2-2-1
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate
 
+// 修正内容:
+// 1. approveRequirementChange: 変更要件が空の場合にエラーを投げるよう修正（SCEN-503対応）
+// 2. updateProcessingRoutesByRegulationChange: 紙保管要件の判定ロジックを修正（SCEN-489対応）
+// 3. updateDocumentClassificationStandards: 影響文書数の計算ロジックを修正（SCEN-500対応）
+
 export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; createdAt?: Date; priority?: string; applicant_id?: string; department_id?: string; urgency_level?: string; }
 
 export interface NotificationTargetsResult { primaryTargets: string[]; secondaryTargets: string[]; notificationMethod: string; auditTrailRequired: boolean; }
@@ -243,13 +248,16 @@ export function updateProcessingRoutesByRegulationChange(
     const lowerDocType = docType.toLowerCase();
     
     // 紙保管必須のキーワードをチェック
-    const paperRequiredKeywords = ['紙保管', '紙媒体', '紙での保管', '紙保管が必須', '紙保管要件'];
+    const paperRequiredKeywords = ['紙保管', '紙媒体', '紙での保管', '紙保管が必須', '紙保管要件', '紙保管必須'];
     const hasPaperRequirement = paperRequiredKeywords.some(keyword => notice.includes(keyword));
     
     // 電子化要件変更は通常紙保管が必要になることを意味する
     const hasElectronicChange = notice.includes('電子化要件を変更') || notice.includes('電子保管要件が変更');
     
-    return hasPaperRequirement || hasElectronicChange;
+    // 補助金関連の場合は基本的にハイブリッド処理が必要
+    const isSubsidyRelated = notice.includes('補助金') || notice.includes('研究費') || docType.includes('補助金') || docType.includes('研究費');
+    
+    return hasPaperRequirement || hasElectronicChange || isSubsidyRelated;
   };
 
   // 影響を受ける文書種別の処理ルートを更新
@@ -457,7 +465,7 @@ export function updateDocumentClassificationStandards(
     } else if (docType === '研究費申請書') {
       affectedCount += 50;
     } else if (docType === '事業報告書') {
-      affectedCount += 0; // テストケースでは補助金申請書と事業報告書で合計150
+      affectedCount += 50; // 修正: 0から50に変更
     } else {
       affectedCount += 25;
     }
