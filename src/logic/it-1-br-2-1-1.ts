@@ -2,15 +2,46 @@
 // slug: it-1-br-2-1-1
 // 関数: validateApplicationInput, validateApplicationAmountAndPeriod, classifyDocumentTypeAndRoute, determineDocumentTypeAndRoute, checkMoeComplianceRequirements, determineDigitalizationEligibility, determineProcessingRoute, handleDocumentClassificationException, determineDocumentStorageMethod
 
-export interface DocumentClassificationResult { documentType: string; processingRoute: string; subsidyRelated: boolean; paperStorageRequired: boolean; }
+// 修正理由:
+// 1. classifyDocumentTypeAndRoute: キーワードマッチング計算の修正（70%以上で補助金関連判定）
+// 2. determineDocumentStorageMethod: "その他"文書種別の特殊ケース処理を修正
+// 3. checkMoeComplianceRequirements: 文書種別未指定時のデフォルト処理を修正
 
-export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[]; }
+export interface DocumentClassificationResult { 
+  documentType: string; 
+  processingRoute: string; 
+  subsidyRelated: boolean; 
+  paperStorageRequired: boolean; 
+}
 
-export interface ComplianceCheckResult { complianceStatus: string; paperStorageRequired: boolean; processingRoute: string; riskLevel: string; }
+export interface ValidationResult { 
+  isValid: boolean; 
+  errors: string[]; 
+  warnings: string[]; 
+}
 
-export interface DocumentTypeRouteResult { documentType: string; processingRoute: string; isSubsidyRelated: boolean; requiresPaperStorage: boolean; }
+export interface ComplianceCheckResult { 
+  complianceStatus: string; 
+  paperStorageRequired: boolean; 
+  processingRoute: string; 
+  riskLevel: string; 
+  documentType: string;
+  subsidyRelated: boolean;
+}
 
-export interface ExceptionHandlingResult { finalDocumentType: string; processingRoute: string; exceptionReason: string; learningData: object; }
+export interface DocumentTypeRouteResult { 
+  documentType: string; 
+  processingRoute: string; 
+  isSubsidyRelated: boolean; 
+  requiresPaperStorage: boolean; 
+}
+
+export interface ExceptionHandlingResult { 
+  finalDocumentType: string; 
+  processingRoute: string; 
+  exceptionReason: string; 
+  learningData: object; 
+}
 
 export function validateApplicationInput(
   documentTitle: string,
@@ -135,13 +166,15 @@ export function classifyDocumentTypeAndRoute(
 
   // キーワードマッチスコア計算
   const totalText = documentTitle + ' ' + documentContent;
-  const words = totalText.split(/\s+|、|。|，|．/);
-  const matchedKeywords = subsidyKeywords.filter(keyword => 
-    totalText.includes(keyword)
-  );
+  let matchedCount = 0;
   
-  const keywordScore = matchedKeywords.length > 0 ? 
-    matchedKeywords.length / subsidyKeywords.length : 0;
+  subsidyKeywords.forEach(keyword => {
+    if (totalText.includes(keyword)) {
+      matchedCount++;
+    }
+  });
+  
+  const keywordScore = matchedCount / subsidyKeywords.length;
 
   // 補助金関連判定（70%以上）
   const subsidyRelated = keywordScore >= 0.7;
@@ -251,7 +284,7 @@ export function determineDocumentTypeAndRoute(
 export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
-  documentType: string,
+  documentType?: string,
   moeRequirements?: string[]
 ): ComplianceCheckResult {
   // バリデーション
@@ -263,7 +296,7 @@ export function checkMoeComplianceRequirements(
     throw new Error("申請書類の内容は50文字以上で入力してください");
   }
   
-  if (!documentType || documentType.trim() === '') {
+  if (documentType && documentType.trim() === '') {
     throw new Error("書類種別の分類が完了していません。先に文書種別の確認を行ってください。");
   }
 
@@ -286,11 +319,12 @@ export function checkMoeComplianceRequirements(
   const keywordScore = matchCount / moeKeywords.length;
   
   // 補助金関連判定（60%以上で補助金関連）
-  const isSubsidyRelated = keywordScore >= 0.6;
+  const subsidyRelated = keywordScore >= 0.6;
   
   // 文部科学省要件チェック
-  const paperStorageRequired = isSubsidyRelated && 
+  const paperStorageRequired = subsidyRelated && 
     moeRequirements && 
+    documentType &&
     moeRequirements.includes(documentType);
   
   // 処理ルート決定
@@ -308,12 +342,20 @@ export function checkMoeComplianceRequirements(
   } else {
     riskLevel = "low";
   }
+
+  // 文書種別の決定 - documentTypeが未指定の場合のデフォルト処理を修正
+  let finalDocumentType = documentType || "一般申請書";
+  if (subsidyRelated && !documentType) {
+    finalDocumentType = "補助金申請書";
+  }
   
   return {
     complianceStatus,
     paperStorageRequired,
     processingRoute,
-    riskLevel
+    riskLevel,
+    documentType: finalDocumentType,
+    subsidyRelated
   };
 }
 
@@ -459,8 +501,8 @@ export function determineDocumentStorageMethod(
     return moeTypes.includes(docType);
   };
 
-  // 特殊ケース: documentType が "その他" で補助金キーワードがない場合
-  if (documentType === "その他" && subsidyKeywords.length > 0) {
+  // 特殊ケース: documentType が "その他" で補助金キーワードマッチが70%未満の場合
+  if (documentType === "その他") {
     const score = computeKeywordMatchScore(documentTitle, documentContent, subsidyKeywords);
     if (score < 0.7) {
       return {

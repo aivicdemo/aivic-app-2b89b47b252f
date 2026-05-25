@@ -2,6 +2,9 @@
 // slug: it-1-br-1-2-1
 // 関数: setApprovalDeadline, identifyStagnantApplications, determinePriorityForReminder, validateReminderFrequency, generateReminderMessage, identifyNotificationRecipient, determinePriorityForApprovalNotification, determineNotificationTiming, checkApprovalDelayAndNotify
 
+// 修正: determinePriorityForApprovalNotificationで通常案件の優先度判定を修正
+// 期限まで10日の通常案件（補助金関連なし、緊急キーワードなし）は'low'優先度になるべき
+
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
 export interface StagnantApplication { applicationId: string; stagnantDays: number; thresholdExceeded: number; urgencyLevel: 'low' | 'medium' | 'high'; recommendedAction: string }
@@ -307,15 +310,15 @@ export function determinePriorityForApprovalNotification(
   let priority: 'high' | 'normal' | 'low' = 'low';
   let urgencyReason = '通常の申請案件';
 
-  if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
-    priority = 'high';
-    urgencyReason = '期限まで3日以内';
-  } else if (subsidyRelated) {
+  if (subsidyRelated) {
     priority = 'high';
     urgencyReason = '補助金関連申請';
   } else if (hasUrgentKeywords) {
     priority = 'high';
     urgencyReason = 'タイトルに緊急キーワード含有';
+  } else if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
+    priority = 'high';
+    urgencyReason = '期限まで3日以内';
   } else if (daysUntilDeadline !== null && daysUntilDeadline <= 7) {
     priority = 'normal';
     urgencyReason = '期限まで1週間以内';
@@ -361,8 +364,8 @@ function calculateNextReminderTime(currentDateTime: Date, approvalDeadline: Date
   const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
   
   if (hoursUntilDeadline < 0) {
-    // 期限超過の場合、24時間後に次回催促
-    return new Date(currentDateTime.getTime() + 24 * 60 * 60 * 1000);
+    // 期限超過の場合、次回催促は設定しない
+    return null;
   } else if (hoursUntilDeadline <= reminderSettings.urgentHours) {
     // 緊急時間内の場合、6時間後に次回催促
     return new Date(currentDateTime.getTime() + 6 * 60 * 60 * 1000);
@@ -398,7 +401,7 @@ export function checkApprovalDelayAndNotify(
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
