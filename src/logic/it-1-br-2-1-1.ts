@@ -347,7 +347,7 @@ export function checkMoeComplianceRequirements(
   
   // リスクレベル計算（閾値を調整）
   let riskLevel: string;
-  if (keywordScore >= 0.3) {
+  if (keywordScore >= 0.4) {
     riskLevel = "high";
   } else if (keywordScore >= 0.2) {
     riskLevel = "medium";
