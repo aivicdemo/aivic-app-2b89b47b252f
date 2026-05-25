@@ -2,11 +2,27 @@
 // slug: it-1-br-2-1-1
 // 関数: validateApplicationInput, validateApplicationAmountAndPeriod, classifyDocumentTypeAndRoute, determineDocumentTypeAndRoute, checkMoeComplianceRequirements, determineDigitalizationEligibility, determineProcessingRoute, handleDocumentClassificationException, determineDocumentStorageMethod
 
-export interface ValidationResult { isValid: boolean; errors: string[]; warnings: string[] }
+export interface ValidationResult { 
+  isValid: boolean; 
+  errors: string[]; 
+  warnings: string[];
+  subsidyRelated?: boolean;
+  processingRoute?: 'electronic' | 'hybrid';
+  paperStorageRequired?: boolean;
+  isSubsidyRelated?: boolean;
+  documentType?: string;
+  requiresPaperStorage?: boolean;
+}
 
 export interface DocumentClassificationResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean }
 
-export interface DocumentTypeAndRouteResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; isSubsidyRelated: boolean; requiresPaperStorage: boolean }
+export interface DocumentTypeAndRouteResult { 
+  documentType: string; 
+  processingRoute: 'electronic' | 'hybrid'; 
+  isSubsidyRelated: boolean; 
+  requiresPaperStorage: boolean;
+  paperStorageRequired?: boolean;
+}
 
 export interface ComplianceCheckResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean; complianceStatus?: string; riskLevel?: string }
 
@@ -56,7 +72,57 @@ export function validateApplicationInput(
 
   const isValid = errors.length === 0;
 
-  return { isValid, errors, warnings };
+  // 補助金関連度の判定
+  const subsidyKeywords = [
+    "科研費", "科学研究費", "補助金", "運営費交付金", "設備整備費",
+    "文部科学省", "研究費", "助成金", "交付金", "研究補助"
+  ];
+
+  const totalText = documentTitle + " " + documentContent;
+  const matchedKeywords = subsidyKeywords.filter(keyword => 
+    totalText.includes(keyword)
+  );
+  const keywordScore = matchedKeywords.length / subsidyKeywords.length;
+  const subsidyRelated = keywordScore >= 0.7;
+  const isSubsidyRelated = subsidyRelated;
+
+  // 文書種別判定
+  let documentType: string;
+  if (subsidyRelated) {
+    if (documentTitle.includes("申請")) {
+      documentType = "補助金申請書";
+    } else {
+      documentType = "補助金申請";
+    }
+  } else {
+    if (documentTitle.includes("申請")) {
+      documentType = "一般申請書";
+    } else {
+      documentType = "一般申請";
+    }
+  }
+
+  // MOE要件による紙保管判定
+  const paperStorageRequired = subsidyRelated && (
+    documentType.includes("補助金") || 
+    applicantDepartment.includes("研究")
+  );
+  const requiresPaperStorage = paperStorageRequired;
+
+  // 処理ルート決定
+  const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
+
+  return {
+    isValid,
+    errors,
+    warnings,
+    subsidyRelated,
+    processingRoute,
+    paperStorageRequired,
+    isSubsidyRelated,
+    documentType,
+    requiresPaperStorage
+  };
 }
 
 export function validateApplicationAmountAndPeriod(
@@ -236,13 +302,15 @@ export function determineDocumentTypeAndRoute(
                     titleAndContent.includes("運営費交付金");
   
   const requiresPaperStorage = isSubsidyRelated && moeRelated;
+  const paperStorageRequired = requiresPaperStorage;
   const processingRoute = requiresPaperStorage ? "hybrid" : "electronic";
 
   return {
     documentType,
     processingRoute,
     isSubsidyRelated,
-    requiresPaperStorage
+    requiresPaperStorage,
+    paperStorageRequired
   };
 }
 

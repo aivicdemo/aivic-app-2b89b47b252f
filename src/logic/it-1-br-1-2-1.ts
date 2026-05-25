@@ -350,7 +350,8 @@ export function determineNotificationTiming(
     app.priority === "high" && (currentTime.getTime() - app.createdAt.getTime()) > 24 * 60 * 60 * 1000
   );
   
-  const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0);
+  // 業務負荷が高い場合は通知を抑制
+  const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0 && approverWorkload <= 80);
   
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
@@ -379,7 +380,7 @@ export function checkApprovalDelayAndNotify(
     throw new Error("承認期限が設定されていないため、遅延検知ができません。");
   }
 
-  if (!reminderSettings) {
+  if (!reminderSettings || reminderSettings.urgentHours < 0) {
     throw new Error("催促通知のタイミング設定が正しくありません。システム管理者にお問い合わせください。");
   }
 
@@ -390,7 +391,7 @@ export function checkApprovalDelayAndNotify(
   let notificationType = "";
   let delayStatus = "正常";
   
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     shouldNotify = true;
     notificationType = "緊急催促";
     delayStatus = "緊急";
