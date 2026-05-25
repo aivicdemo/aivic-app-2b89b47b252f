@@ -1,54 +1,64 @@
-import { handleSystemFailureAlternativeProcess } from "../../src/logic/it-1";
+import { handleSystemFailureFallback } from "../../src/logic/it-1";
 
 describe("承認フローの進捗状況と滞留期間をリアルタイムで可視化する", () => {
+  // SCEN-439
   test("システム障害時代替処理 - 障害復旧後にデータ同期が正常に実行される", () => {
-    // SCEN-439
-    
-    // 重大な障害で補助金関連書類を緊急処理する場合
-    const criticalFailureResult = handleSystemFailureAlternativeProcess(
-      "critical_failure",
-      "database_connection",
-      "補助金申請書",
-      9
+    // システムダウン状態での緊急対応ケース
+    const systemDownResult = handleSystemFailureFallback(
+      "down",
+      "APPL-2024-001", 
+      "manager",
+      {}
     );
     
-    expect(criticalFailureResult.alternativeProcess).toBe("full_paper_mode");
-    expect(criticalFailureResult.notificationTargets).toEqual(["all_staff", "management", "it_support"]);
-    expect(criticalFailureResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(criticalFailureResult.estimatedRecoveryTime).toBe(8);
-    
-    // 部分的な障害で一般書類を処理する場合
-    const partialFailureResult = handleSystemFailureAlternativeProcess(
+    expect(systemDownResult.fallbackMethod).toBe("emergency_paper");
+    expect(systemDownResult.emergencyContactList).toEqual(["contact1@university.ac.jp", "contact2@university.ac.jp"]);
+    expect(systemDownResult.paperFormUrl).toBe("https://system/forms/paper/APPL-2024-001");
+    expect(systemDownResult.syncRequired).toBe(true);
+
+    // 部分障害状態での対応ケース  
+    const partialFailureResult = handleSystemFailureFallback(
       "partial_failure",
-      "api_timeout",
-      "人事申請書",
-      5
+      "APPL-2024-002",
+      "staff", 
+      {}
     );
     
-    expect(partialFailureResult.alternativeProcess).toBe("manual_hybrid_mode");
-    expect(partialFailureResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(partialFailureResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(partialFailureResult.estimatedRecoveryTime).toBe(4);
-    
-    // 軽微な障害で低緊急度の書類を処理する場合
-    const minorFailureResult = handleSystemFailureAlternativeProcess(
-      "minor_issue",
-      "network_slow",
-      "一般申請書",
-      3
+    expect(partialFailureResult.fallbackMethod).toBe("manual_hybrid_mode");
+    expect(partialFailureResult.syncRequired).toBe(true);
+
+    // 正常状態での通常処理ケース
+    const normalResult = handleSystemFailureFallback(
+      "operational", 
+      "APPL-2024-003",
+      "user",
+      {}
     );
     
-    expect(minorFailureResult.alternativeProcess).toBe("temporary_workaround");
-    expect(minorFailureResult.notificationTargets).toEqual(["relevant_staff", "it_support"]);
-    expect(minorFailureResult.dataRecoveryPlan).toBe("sync_paper_to_electronic_after_recovery");
-    expect(minorFailureResult.estimatedRecoveryTime).toBe(2);
+    expect(normalResult.fallbackMethod).toBe("normal");
+    expect(normalResult.emergencyContactList).toEqual([]);
+    expect(normalResult.paperFormUrl).toBe("");
+    expect(normalResult.syncRequired).toBe(false);
+
+    // エラーケース - 申請書類が存在しない場合
+    expect(() => {
+      handleSystemFailureFallback(
+        "down",
+        "",
+        "manager", 
+        {}
+      );
+    }).toThrow("指定された申請書類が見つかりません。正しい申請番号を入力してください。");
+
+    // 警告ケース - 3時間以上の障害継続
+    const longFailureResult = handleSystemFailureFallback(
+      "error",
+      "APPL-2024-004", 
+      "staff",
+      {}
+    );
     
-    // システム状況が不明な場合のエラー
-    expect(() => handleSystemFailureAlternativeProcess(
-      "",
-      "unknown_error",
-      "申請書",
-      5
-    )).toThrow("システム状況を確認できません。情報システム課に連絡してください。");
+    expect(longFailureResult.fallbackMethod).toBe("emergency_paper");
+    expect(longFailureResult.syncRequired).toBe(true);
   });
 });

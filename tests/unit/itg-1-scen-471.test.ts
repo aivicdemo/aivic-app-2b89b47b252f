@@ -1,62 +1,74 @@
-import { determineDocumentTypeAndRoute } from "../../src/logic/it-1-br-2-1-1";
+import { checkMoeComplianceRequirements } from '../../src/logic/it-1-br-2-1-1';
 
-describe("申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能", () => {
-  test("文書種別自動判定 - 申請書類の内容から文書種別が正しく判定される", () => {
+describe('申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能', () => {
+  test('文書種別自動判定 - 申請書類の内容から文書種別が正しく判定される', () => {
     // SCEN-471
     
-    // 補助金関連書類（科研費申請）のテスト
-    const subsidyResult = determineDocumentTypeAndRoute(
-      "令和6年度科学研究費助成事業申請書",
-      "本研究では文部科学省の科研費を活用して先端技術研究を推進します。運営費交付金との連携により効率的な研究体制を構築し、設備整備費も含めた総合的な研究計画を策定しております。",
-      "総務課"
+    // 補助金関連書類のテストケース
+    const subsidyDocumentTitle = '文部科学省科学研究費助成事業申請書';
+    const subsidyDocumentContent = '研究課題名：AIを活用した教育システムの開発 研究期間：3年 申請金額：5,000,000円 本研究は文部科学省の重点施策である教育のデジタル化推進に寄与する';
+    const subsidyDocumentType = '補助金申請書';
+    const moeRequirements = ['補助金申請書', '実績報告書', '収支決算書'];
+
+    const subsidyResult = checkMoeComplianceRequirements(
+      subsidyDocumentTitle,
+      subsidyDocumentContent,
+      subsidyDocumentType,
+      moeRequirements
     );
-    
-    expect(subsidyResult.documentType).toBe("補助金申請");
-    expect(subsidyResult.processingRoute).toBe("hybrid");
-    expect(subsidyResult.subsidyRelated).toBe(true);
+
+    expect(subsidyResult.complianceStatus).toBe('compliant');
     expect(subsidyResult.paperStorageRequired).toBe(true);
-    
-    // 一般申請書類のテスト
-    const generalResult = determineDocumentTypeAndRoute(
-      "職員研修参加申請書",
-      "来月開催される業務効率化研修への参加を希望いたします。研修内容はプロジェクト管理手法とコミュニケーション改善に関するものです。",
-      "人事課"
+    expect(subsidyResult.processingRoute).toBe('hybrid');
+    expect(subsidyResult.riskLevel).toBe('high');
+
+    // 一般申請書類のテストケース
+    const generalDocumentTitle = '研修会参加申請書';
+    const generalDocumentContent = '研修名：情報セキュリティ研修 開催日：2024年3月15日 参加費：10,000円 業務上の必要性：最新のセキュリティ知識を習得するため';
+    const generalDocumentType = '研修申請書';
+
+    const generalResult = checkMoeComplianceRequirements(
+      generalDocumentTitle,
+      generalDocumentContent,
+      generalDocumentType,
+      moeRequirements
     );
-    
-    expect(generalResult.documentType).toBe("一般申請");
-    expect(generalResult.processingRoute).toBe("electronic");
-    expect(generalResult.subsidyRelated).toBe(false);
+
+    expect(generalResult.complianceStatus).toBe('review_required');
     expect(generalResult.paperStorageRequired).toBe(false);
-    
-    // 研究部署からの補助金関連書類（閾値0.6適用）のテスト
-    const researchResult = determineDocumentTypeAndRoute(
-      "研究設備導入申請書",
-      "文部科学省の補助金制度を活用した研究機器の導入計画書です。運営費交付金との併用により効果的な研究環境整備を目指します。",
-      "研究推進課"
+    expect(generalResult.processingRoute).toBe('electronic');
+    expect(generalResult.riskLevel).toBe('low');
+
+    // 境界値テスト：キーワード一致度60%のケース
+    const borderlineTitle = '科研費に関する設備購入申請';
+    const borderlineContent = '設備名：研究用コンピュータ 購入目的：データ解析業務の効率化';
+    const borderlineType = '設備購入申請書';
+
+    const borderlineResult = checkMoeComplianceRequirements(
+      borderlineTitle,
+      borderlineContent,
+      borderlineType,
+      moeRequirements
     );
-    
-    expect(researchResult.documentType).toBe("補助金申請");
-    expect(researchResult.processingRoute).toBe("hybrid");
-    expect(researchResult.subsidyRelated).toBe(true);
-    expect(researchResult.paperStorageRequired).toBe(true);
-    
-    // エラーケースのテスト
-    expect(() => determineDocumentTypeAndRoute(
-      "短い",
-      "申請内容",
-      "総務課"
-    )).toThrow("申請書類のタイトルは10文字以上で入力してください");
-    
-    expect(() => determineDocumentTypeAndRoute(
-      "適切な長さの申請書タイトル",
-      "短い",
-      "総務課"
-    )).toThrow("申請書類の内容は50文字以上で入力してください");
-    
-    expect(() => determineDocumentTypeAndRoute(
-      "適切な長さの申請書タイトル",
-      "十分な長さの申請内容です。この内容は50文字以上の要件を満たすために追加された文章です。",
-      ""
-    )).toThrow("申請者の所属部署を選択してください");
+
+    expect(borderlineResult.complianceStatus).toBe('review_required');
+    expect(borderlineResult.paperStorageRequired).toBe(false);
+    expect(borderlineResult.processingRoute).toBe('electronic');
+    expect(borderlineResult.riskLevel).toBe('medium');
+
+    // エラーケース：タイトルが空
+    expect(() => {
+      checkMoeComplianceRequirements('', 'test content', 'test type', moeRequirements);
+    }).toThrow('申請書類のタイトルが入力されていません。法令要件の判定ができません。');
+
+    // エラーケース：内容が不十分
+    expect(() => {
+      checkMoeComplianceRequirements('test title', 'short', 'test type', moeRequirements);
+    }).toThrow('申請書類の内容は50文字以上で入力してください');
+
+    // エラーケース：文書種別未分類
+    expect(() => {
+      checkMoeComplianceRequirements('test title', 'sufficient content for testing purposes and validation', '', moeRequirements);
+    }).toThrow('書類種別の分類が完了していません。先に文書種別の確認を行ってください。');
   });
 });

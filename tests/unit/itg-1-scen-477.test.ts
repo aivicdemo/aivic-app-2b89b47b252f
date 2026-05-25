@@ -1,101 +1,57 @@
-import { setApproverAuthorityLevel } from "../../src/logic/it-1-br-2-2-1";
+import { determineApprovalHierarchy } from '../../src/logic/it-1-br-2-2-1';
 
 describe("文書種別に応じた承認フロー自動振り分け機能", () => {
-  test("申請者と申請金額に基づいて適切な権限レベルが判定される", () => {
+  test("承認権限レベル判定 - 申請者と申請金額に基づいて適切な権限レベルが判定される", () => {
     // SCEN-477
     
-    // 補助金関連書類で高額案件（1000万円）の場合
-    const result1 = setApproverAuthorityLevel(
-      "補助金申請書",
-      true,
-      false,
-      "研究推進課",
-      10000000
-    );
-    expect(result1.requiredAuthorityLevel).toBe("department_head");
-    expect(result1.approverRoles).toEqual(["department_head"]);
-    expect(result1.escalationRequired).toBe(true);
+    // 10万円未満の一般申請 - 課長承認
+    const lowAmountResult = determineApprovalHierarchy(50000, "一般申請", "総務部");
+    expect(lowAmountResult.approvalLevel).toBe("課長承認");
+    expect(lowAmountResult.estimatedDays).toBe(3);
+    expect(lowAmountResult.requiresPaperApproval).toBe(false);
+    expect(lowAmountResult.approvers).toEqual(["課長"]);
 
-    // 一般書類で低額案件（100万円）の場合
-    const result2 = setApproverAuthorityLevel(
-      "一般申請書",
-      false,
-      false,
-      "総務課",
-      1000000
-    );
-    expect(result2.requiredAuthorityLevel).toBe("section_chief");
-    expect(result2.approverRoles).toEqual(["section_chief"]);
-    expect(result2.escalationRequired).toBe(false);
+    // 10万円以上100万円未満の一般申請 - 部長承認
+    const mediumAmountResult = determineApprovalHierarchy(500000, "一般申請", "総務部");
+    expect(mediumAmountResult.approvalLevel).toBe("部長承認");
+    expect(mediumAmountResult.estimatedDays).toBe(5);
+    expect(mediumAmountResult.requiresPaperApproval).toBe(false);
+    expect(mediumAmountResult.approvers).toEqual(["部長"]);
 
-    // 紙保管必須書類の場合
-    const result3 = setApproverAuthorityLevel(
-      "実績報告書",
-      true,
-      true,
-      "財務課",
-      3000000
-    );
-    expect(result3.requiredAuthorityLevel).toBe("department_head");
-    expect(result3.approverRoles).toEqual(["department_head", "administrative_director"]);
-    expect(result3.escalationRequired).toBe(false);
+    // 100万円以上の一般申請 - 理事承認
+    const highAmountResult = determineApprovalHierarchy(2000000, "一般申請", "総務部");
+    expect(highAmountResult.approvalLevel).toBe("理事承認");
+    expect(highAmountResult.estimatedDays).toBe(7);
+    expect(highAmountResult.requiresPaperApproval).toBe(false);
+    expect(highAmountResult.approvers).toEqual(["理事"]);
 
-    // 超高額案件（1000万円以上）で理事レベルエスカレーション
-    const result4 = setApproverAuthorityLevel(
-      "設備導入申請書",
-      true,
-      false,
-      "研究推進課",
-      15000000
-    );
-    expect(result4.requiredAuthorityLevel).toBe("department_head");
-    expect(result4.approverRoles).toEqual(["department_head"]);
-    expect(result4.escalationRequired).toBe(true);
+    // 100万円以上の補助金申請 - 理事承認、紙承認必要
+    const subsidyHighAmountResult = determineApprovalHierarchy(1500000, "補助金申請", "研究推進部");
+    expect(subsidyHighAmountResult.approvalLevel).toBe("理事承認");
+    expect(subsidyHighAmountResult.estimatedDays).toBe(7);
+    expect(subsidyHighAmountResult.requiresPaperApproval).toBe(true);
+    expect(subsidyHighAmountResult.approvers).toEqual(["理事"]);
 
-    // 境界値テスト：500万円ちょうど
-    const result5 = setApproverAuthorityLevel(
-      "研究費申請書",
-      true,
-      false,
-      "研究推進課",
-      5000000
-    );
-    expect(result5.requiredAuthorityLevel).toBe("section_chief");
-    expect(result5.approverRoles).toEqual(["section_chief"]);
-    expect(result5.escalationRequired).toBe(false);
+    // 100万円未満の補助金申請 - 部長承認、紙承認必要
+    const subsidyMediumAmountResult = determineApprovalHierarchy(800000, "補助金申請", "研究推進部");
+    expect(subsidyMediumAmountResult.approvalLevel).toBe("部長承認");
+    expect(subsidyMediumAmountResult.estimatedDays).toBe(5);
+    expect(subsidyMediumAmountResult.requiresPaperApproval).toBe(true);
+    expect(subsidyMediumAmountResult.approvers).toEqual(["部長"]);
 
-    // 境界値テスト：500万円+1円で高額案件
-    const result6 = setApproverAuthorityLevel(
-      "研究費申請書",
-      true,
-      false,
-      "研究推進課",
-      5000001
-    );
-    expect(result6.requiredAuthorityLevel).toBe("department_head");
-    expect(result6.approverRoles).toEqual(["department_head"]);
-    expect(result6.escalationRequired).toBe(false);
-
-    // エラーケース：予算金額が負の値
+    // 申請金額が0円以下の場合 - エラー
     expect(() => {
-      setApproverAuthorityLevel(
-        "申請書",
-        false,
-        false,
-        "総務課",
-        -1000000
-      );
-    }).toThrow("予算金額は0以上の値を入力してください");
+      determineApprovalHierarchy(0, "一般申請", "総務部");
+    }).toThrow("申請金額は1円以上で入力してください");
 
-    // エラーケース：所属部署が空
+    // 申請金額が1億円を超える場合 - 警告
+    const veryHighAmountResult = determineApprovalHierarchy(150000000, "一般申請", "総務部");
+    expect(veryHighAmountResult.approvalLevel).toBe("理事承認");
+    expect(veryHighAmountResult.estimatedDays).toBe(7);
+
+    // 所属部署が未入力の場合 - エラー
     expect(() => {
-      setApproverAuthorityLevel(
-        "申請書",
-        false,
-        false,
-        "",
-        1000000
-      );
-    }).toThrow("申請者の所属部署を選択してください");
+      determineApprovalHierarchy(100000, "一般申請", "");
+    }).toThrow("承認ルート設定のため、所属部署を入力してください");
   });
 });

@@ -1,83 +1,85 @@
-import { generateReminderMessage } from "../../src/logic/it-1-br-1-2-1";
+import { generateReminderMessage } from '../../src/logic/it-1-br-1-2-1';
 
-describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
-  test("滞留期間と案件重要度に応じて適切な催促メッセージが生成される", () => {
-    // SCEN-453: 催促メッセージ生成 - 滞留期間と重要度に応じた適切な催促メッセージが生成される
-
-    // 低緊急度（3日以内滞留、一般書類）
-    const lowUrgencyResult = generateReminderMessage(
-      "APP001",
-      3,
-      "一般事務",
-      "田中部長",
-      "佐藤太郎"
-    );
-    expect(lowUrgencyResult.urgencyLevel).toBe("low");
-    expect(lowUrgencyResult.notificationMethod).toBe("system");
-
-    // 中緊急度（4-7日滞留）
-    const mediumUrgencyResult = generateReminderMessage(
-      "APP002", 
-      5,
-      "一般事務",
-      "田中部長",
-      "佐藤太郎"
-    );
-    expect(mediumUrgencyResult.urgencyLevel).toBe("medium");
-    expect(mediumUrgencyResult.notificationMethod).toBe("both");
-
-    // 高緊急度（8日以上滞留）
-    const highUrgencyResult = generateReminderMessage(
-      "APP003",
-      8,
-      "一般事務", 
-      "田中部長",
-      "佐藤太郎"
-    );
-    expect(highUrgencyResult.urgencyLevel).toBe("high");
-    expect(highUrgencyResult.notificationMethod).toBe("email");
-
-    // 補助金関連書類での緊急度上昇（低→中）
-    const subsidyLowToMediumResult = generateReminderMessage(
-      "APP004",
-      3,
-      "補助金申請",
-      "田中部長", 
-      "佐藤太郎"
-    );
-    expect(subsidyLowToMediumResult.urgencyLevel).toBe("medium");
-
-    // 補助金関連書類での緊急度上昇（中→高）
-    const subsidyMediumToHighResult = generateReminderMessage(
-      "APP005",
-      5,
-      "補助金申請",
-      "田中部長",
-      "佐藤太郎"
-    );
-    expect(subsidyMediumToHighResult.urgencyLevel).toBe("high");
-
-    // エラーケース：滞留日数が負の値
-    expect(() => {
-      generateReminderMessage("APP006", -1, "一般事務", "田中部長", "佐藤太郎");
-    }).toThrow("滞留日数は0以上である必要があります");
-
-    // エラーケース：承認者名が空
-    expect(() => {
-      generateReminderMessage("APP007", 3, "一般事務", "", "佐藤太郎");
-    }).toThrow("催促対象の承認者が特定できません");
-
-    // エラーケース：申請者名が空
-    expect(() => {
-      generateReminderMessage("APP008", 3, "一般事務", "田中部長", "");
-    }).toThrow("申請者情報が不正です");
-
-    // メッセージ内容の確認
-    expect(lowUrgencyResult.messageContent).toContain("佐藤太郎");
-    expect(lowUrgencyResult.messageContent).toContain("一般事務");
-    expect(lowUrgencyResult.messageContent).toContain("3");
+describe('承認遅延案件を検知し担当者に自動で催促通知を送信する', () => {
+  test('催促メッセージ生成 - 滞留期間と重要度に応じた適切な催促メッセージが生成される', () => {
+    // SCEN-453
     
-    expect(mediumUrgencyResult.messageContent).toContain("進捗確認");
-    expect(highUrgencyResult.messageContent).toContain("迅速な対応");
+    // 通常案件（滞留3日、一般申請）
+    const normalResult = generateReminderMessage(
+      'APP-001',
+      3,
+      '一般申請',
+      '田中課長',
+      '山田太郎'
+    );
+    
+    expect(normalResult.messageContent).toContain('山田太郎');
+    expect(normalResult.messageContent).toContain('一般申請');
+    expect(normalResult.messageContent).toContain('3日');
+    expect(normalResult.urgencyLevel).toBe('low');
+    expect(normalResult.notificationMethod).toBe('system');
+    
+    // 中程度の緊急度（滞留5日、一般申請）
+    const mediumResult = generateReminderMessage(
+      'APP-002',
+      5,
+      '一般申請',
+      '佐藤部長',
+      '鈴木花子'
+    );
+    
+    expect(mediumResult.urgencyLevel).toBe('medium');
+    expect(mediumResult.notificationMethod).toBe('both');
+    
+    // 高緊急度（滞留8日、一般申請）
+    const highResult = generateReminderMessage(
+      'APP-003',
+      8,
+      '一般申請',
+      '高橋理事',
+      '伊藤次郎'
+    );
+    
+    expect(highResult.urgencyLevel).toBe('high');
+    expect(highResult.notificationMethod).toBe('email');
+    
+    // 補助金関連で緊急度上昇（滞留3日、補助金申請）
+    const subsidyResult = generateReminderMessage(
+      'APP-004',
+      3,
+      '補助金申請',
+      '中村課長',
+      '加藤三郎'
+    );
+    
+    expect(subsidyResult.urgencyLevel).toBe('medium');
+    expect(subsidyResult.notificationMethod).toBe('both');
+    
+    // 補助金関連で最高緊急度（滞留5日、補助金申請）
+    const urgentSubsidyResult = generateReminderMessage(
+      'APP-005',
+      5,
+      '補助金申請',
+      '小林部長',
+      '松本四郎'
+    );
+    
+    expect(urgentSubsidyResult.urgencyLevel).toBe('high');
+    expect(urgentSubsidyResult.notificationMethod).toBe('email');
+    
+    // エラー処理：滞留日数が負の値
+    expect(() => {
+      generateReminderMessage('APP-006', -1, '一般申請', '承認者', '申請者');
+    }).toThrow('滞留日数は0以上である必要があります');
+    
+    // エラー処理：承認者名が空
+    expect(() => {
+      generateReminderMessage('APP-007', 3, '一般申請', '', '申請者');
+    }).toThrow('催促対象の承認者が特定できません');
+    
+    // エラー処理：申請者名が空
+    expect(() => {
+      generateReminderMessage('APP-008', 3, '一般申請', '承認者', '');
+    }).toThrow('申請者情報が不正です');
   });
 });

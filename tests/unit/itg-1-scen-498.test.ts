@@ -1,41 +1,60 @@
-import { analyzeRegulationImpactScope } from "../../src/logic/it-1-br-1779263788059-2-1-1";
+import { analyzeRegulationImpactScope } from '../../src/logic/it-1-br-1779263788059-2-1-1';
+
+const fetchMock = require("jest-fetch-mock");
 
 describe("申請書類の種別を自動判別し適切な処理ルートを決定する機能", () => {
-  test("法令改正の影響を受ける文書種別を特定し、処理ルート変更が必要な文書種別とその変更内容を判定する", () => {
+  beforeEach(() => {
+    fetchMock.resetMocks();
+  });
+
+  test("法令改正影響範囲分析 - 改正内容の影響を受ける文書種別が正しく特定される", () => {
     // SCEN-498
     
-    const regulationChangeContent = "補助金に関する電子保存の要件を緩和し、一部の実績報告書については電子のみでの保存を可能とする。ただし、設備導入申請書については従来通り紙保存を必須とする。";
-    const affectedRegulationTypes = ["補助金関連法令", "文書保存規則"];
+    const regulationChangeContent = "補助金申請書類の電子保管について文部科学省令第45条を改正し、研究費申請書および設備申請書において紙保管を必須とする。";
+    const affectedRegulationTypes = ["文部科学省令", "補助金関連規則"];
     const currentDocumentTypes = [
       {
-        typeName: "補助金申請書",
-        regulationCategory: "補助金関連法令",
-        storageRequirement: "hybrid"
+        typeName: "研究費申請書",
+        regulationCategory: "文部科学省令",
+        storageRequirement: "electronic"
       },
       {
-        typeName: "実績報告書", 
-        regulationCategory: "補助金関連法令",
-        storageRequirement: "hybrid"
+        typeName: "設備申請書", 
+        regulationCategory: "文部科学省令",
+        storageRequirement: "electronic"
       },
       {
-        typeName: "設備導入申請書",
-        regulationCategory: "補助金関連法令", 
-        storageRequirement: "hybrid"
+        typeName: "人事申請書",
+        regulationCategory: "学内規則",
+        storageRequirement: "electronic"
       },
       {
-        typeName: "一般事務書類",
-        regulationCategory: "一般事務規則",
+        typeName: "旅費申請書",
+        regulationCategory: "会計規則",
         storageRequirement: "electronic"
       }
     ];
 
-    const result = analyzeRegulationImpactScope(regulationChangeContent, affectedRegulationTypes, currentDocumentTypes);
+    const result = analyzeRegulationImpactScope(
+      regulationChangeContent,
+      affectedRegulationTypes,
+      currentDocumentTypes
+    );
 
-    expect(result.affectedDocumentTypes).toEqual(["補助金申請書", "実績報告書", "設備導入申請書"]);
+    expect(result.affectedDocumentTypes).toEqual(["研究費申請書", "設備申請書"]);
     expect(result.processingRouteChanges).toEqual([
-      { documentType: "実績報告書", oldRoute: "hybrid", newRoute: "electronic" }
+      {
+        documentType: "研究費申請書",
+        oldRoute: "electronic",
+        newRoute: "hybrid"
+      },
+      {
+        documentType: "設備申請書", 
+        oldRoute: "electronic",
+        newRoute: "hybrid"
+      }
     ]);
-    expect(result.impactLevel).toBe("軽微");
-    expect(result.changeRequiredCount).toBe(1);
+    expect(result.impactLevel).toBe("中程度");
+    expect(result.changeRequiredCount).toBe(2);
   });
 });

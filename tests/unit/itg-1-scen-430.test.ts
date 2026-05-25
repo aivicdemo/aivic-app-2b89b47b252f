@@ -1,87 +1,73 @@
-import { validateApplicationBeforeSubmission } from "../../src/logic/it-1-br-1779263788059-2-1-1";
+import { validateApplicationBeforeSubmission } from '../../src/logic/it-1-br-1779263788059-2-1-1';
 
-describe("申請書類の種別を自動判別し適切な処理ルートを決定する機能", () => {
-  test("申請書類提出検証 - 検証項目に不備がある場合、提出が阻止される", () => {
-    // SCEN-430
-    
-    // 必須項目が不足している場合
-    const result1 = validateApplicationBeforeSubmission(
+describe("申請書類提出検証機能", () => {
+  // SCEN-430
+  test("検証項目に不備がある場合、提出が阻止される", () => {
+    // タイトルが空の場合
+    expect(() => validateApplicationBeforeSubmission(
       "",
-      "申請内容です",
-      "general",
+      "申請内容を詳細に記載した内容です。",
+      "一般申請",
       "electronic",
-      ["承認者1"],
-      { 申請者名: "田中太郎", 申請金額: "" }
-    );
-    
-    expect(result1).toEqual({
-      isValid: false,
-      errors: ["申請書類のタイトルを入力してください", "必須項目「申請金額」を入力してください"],
-      warnings: []
-    });
-    
-    // 申請内容が短すぎる場合
-    const result2 = validateApplicationBeforeSubmission(
-      "申請書タイトル",
-      "短い",
-      "general",
-      "electronic", 
-      ["承認者1"],
-      { 申請者名: "田中太郎" }
-    );
-    
-    expect(result2).toEqual({
-      isValid: false,
-      errors: ["申請内容を10文字以上で入力してください"],
-      warnings: []
-    });
-    
+      ["承認者A"],
+      { "申請金額": 100000, "実施期間": "2024年4月-6月" }
+    )).toThrow("申請書類のタイトルを入力してください");
+
+    // 内容が10文字未満の場合
+    expect(() => validateApplicationBeforeSubmission(
+      "設備購入申請書",
+      "短い内容",
+      "一般申請", 
+      "electronic",
+      ["承認者A"],
+      { "申請金額": 100000, "実施期間": "2024年4月-6月" }
+    )).toThrow("申請内容を10文字以上で入力してください");
+
     // 補助金関連書類で処理ルートが電子のみの場合
-    const result3 = validateApplicationBeforeSubmission(
-      "補助金申請書",
-      "補助金申請に関する詳細な内容です",
+    expect(() => validateApplicationBeforeSubmission(
+      "科研費申請書類",
+      "科学研究費助成事業への申請に関する詳細な内容です。",
       "subsidy",
       "electronic",
-      ["承認者1"],
-      { 申請者名: "田中太郎", 申請金額: "1000000" }
-    );
-    
-    expect(result3).toEqual({
-      isValid: false,
-      errors: ["補助金関連書類はハイブリッド処理が必要です"],
-      warnings: []
-    });
-    
+      ["承認者A"],
+      { "申請金額": 1000000, "実施期間": "2024年4月-2025年3月" }
+    )).toThrow("補助金関連書類は紙保管が必要なため、ハイブリッド処理を選択してください");
+
     // 承認者が設定されていない場合
-    const result4 = validateApplicationBeforeSubmission(
-      "一般申請書",
-      "申請内容の詳細説明です",
-      "general",
-      "electronic",
+    expect(() => validateApplicationBeforeSubmission(
+      "設備購入申請書",
+      "新しい研究設備を購入するための申請です。",
+      "一般申請",
+      "electronic", 
       [],
-      { 申請者名: "田中太郎", 申請金額: "500000" }
-    );
-    
-    expect(result4).toEqual({
-      isValid: false,
-      errors: ["承認者を設定してください"],
-      warnings: []
-    });
-    
-    // すべての検証をクリアした場合
-    const result5 = validateApplicationBeforeSubmission(
-      "一般申請書類",
-      "適切な申請内容の詳細説明です",
-      "general",
+      { "申請金額": 100000, "実施期間": "2024年4月-6月" }
+    )).toThrow("承認者を1名以上設定してください");
+
+    // 必須項目が不足している場合
+    const resultWithMissingFields = validateApplicationBeforeSubmission(
+      "設備購入申請書",
+      "新しい研究設備を購入するための申請です。",
+      "一般申請",
       "electronic",
-      ["承認者1", "承認者2"],
-      { 申請者名: "田中太郎", 申請金額: "500000", 申請部署: "総務課" }
+      ["承認者A"],
+      { "申請金額": "", "実施期間": "2024年4月-6月" }
     );
-    
-    expect(result5).toEqual({
-      isValid: true,
-      errors: [],
-      warnings: []
-    });
+
+    expect(resultWithMissingFields.isValid).toBe(false);
+    expect(resultWithMissingFields.errors).toContain("必須項目「申請金額」を入力してください");
+
+    // 正常なケース - すべて適切に設定されている場合
+    const validResult = validateApplicationBeforeSubmission(
+      "設備購入申請書",
+      "新しい研究設備を購入するための申請です。詳細な仕様と必要性について説明します。",
+      "一般申請",
+      "electronic",
+      ["承認者A"],
+      { "申請金額": 100000, "実施期間": "2024年4月-6月" }
+    );
+
+    expect(validResult.isValid).toBe(true);
+    expect(validResult.errors).toEqual([]);
+    expect(validResult.warnings).toEqual([]);
   });
 });

@@ -1,23 +1,23 @@
-import { checkMoeComplianceRequirements } from "../../src/logic/it-1-br-2-1-1";
+import { determineDigitalizationEligibility } from '../../src/logic/it-1-br-2-1-1';
 
 describe("申請書類の文書種別を自動判別し補助金関連度に基づいて電子化可否を判定する機能", () => {
-  test("判定基準が曖昧な文書の場合、安全側の処理ルートが選択される", () => {
-    // SCEN-476
-    const documentTitle = "教育研究設備導入申請書";
-    const documentContent = "教育研究環境の改善のため、実験機器の購入を申請します。予算は300万円です。";
-    const documentType = "設備申請書";
-    const moeRequirements = ["補助金", "助成金", "研究費", "設備費"];
+  // SCEN-476: [edge] 電子化可否判定 - 判定基準が曖昧な文書の場合、安全側の処理ルートが選択される
+  test('判定基準が曖昧な文書で安全側の処理ルートが選択される', () => {
+    const documentTitle = "研究設備導入に関する検討資料";
+    const documentContent = "新しい研究設備の導入について検討する。予算の確保と設置場所の調整が必要である。関連する規定の確認も行う。";
+    const documentType = "検討資料";
+    const subsidyRelevanceScore = 0.65;
 
-    const result = checkMoeComplianceRequirements(
+    const result = determineDigitalizationEligibility(
       documentTitle,
       documentContent,
       documentType,
-      moeRequirements
+      subsidyRelevanceScore
     );
 
-    expect(result.complianceStatus).toBe("review_required");
-    expect(result.paperStorageRequired).toBe(true);
+    expect(result.documentType).toBe("検討資料");
     expect(result.processingRoute).toBe("hybrid");
-    expect(result.riskLevel).toBe("medium");
+    expect(result.subsidyRelated).toBe(false);
+    expect(result.paperStorageRequired).toBe(false);
   });
 });

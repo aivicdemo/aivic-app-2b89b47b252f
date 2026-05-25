@@ -1,76 +1,47 @@
-import { identifyStagnantApplications } from "../../src/logic/it-1-br-1-2-1";
+import { checkApprovalDelayAndNotify } from "../../src/logic/it-1-br-1-2-1";
 
 describe("承認遅延案件を検知し担当者に自動で催促通知を送信する", () => {
   test("期限ちょうどの案件の取扱いが適切に判定される", () => {
     // SCEN-446
-    const currentDate = new Date("2024-01-15T00:00:00Z");
+    const currentDateTime = new Date("2024-03-15T14:00:00Z");
+    const approvalDeadline = new Date("2024-03-15T14:00:00Z"); // 期限ちょうど
+    const applicationId = "APP-2024-0315";
+    const reminderSettings = {
+      beforeDays: [3, 1],
+      urgentHours: 6
+    };
+    const approverInfo = {
+      id: "approver001",
+      name: "承認者田中",
+      email: "tanaka@university.ac.jp",
+      department: "総務課"
+    };
+
+    // 期限ちょうど（残り0時間）の場合、緊急催促として判定される
+    const timeUntilDeadline = approvalDeadline.getTime() - currentDateTime.getTime();
+    const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60); // 0時間
     
-    // 通常案件は3日が基準、補助金関連は5日が基準
-    const stagnationThresholds = {
-      normal: 3,
-      subsidyRelated: 5,
-      urgent: 1
-    };
-
-    // 期限ちょうど（3日）の通常案件
-    const exactThresholdNormalApp = {
-      applicationId: "APP-001",
-      currentStage: "部長承認",
-      stageStartDate: new Date("2024-01-12T00:00:00Z"), // 3日前
-      documentType: "一般申請",
-      isSubsidyRelated: false
-    };
-
-    // 期限ちょうど（5日）の補助金関連案件
-    const exactThresholdSubsidyApp = {
-      applicationId: "APP-002", 
-      currentStage: "理事承認",
-      stageStartDate: new Date("2024-01-10T00:00:00Z"), // 5日前
-      documentType: "補助金申請",
-      isSubsidyRelated: true
-    };
-
-    // 期限を1日超過した案件
-    const exceededApp = {
-      applicationId: "APP-003",
-      currentStage: "課長承認", 
-      stageStartDate: new Date("2024-01-11T00:00:00Z"), // 4日前
-      documentType: "一般申請",
-      isSubsidyRelated: false
-    };
-
-    // 期限内の案件
-    const withinThresholdApp = {
-      applicationId: "APP-004",
-      currentStage: "部長承認",
-      stageStartDate: new Date("2024-01-13T00:00:00Z"), // 2日前
-      documentType: "一般申請", 
-      isSubsidyRelated: false
-    };
-
-    const applicationStatuses = [
-      exactThresholdNormalApp,
-      exactThresholdSubsidyApp,
-      exceededApp,
-      withinThresholdApp
-    ];
-
-    const result = identifyStagnantApplications(
-      applicationStatuses,
-      stagnationThresholds,
-      currentDate
+    const result = checkApprovalDelayAndNotify(
+      applicationId,
+      currentDateTime,
+      approvalDeadline,
+      reminderSettings,
+      approverInfo
     );
 
-    // 期限ちょうどは滞留とは判定されない（閾値以下）
-    // 期限を超過した案件のみが滞留として抽出される
-    expect(result).toEqual([
-      {
-        applicationId: "APP-003",
-        stagnantDays: 4,
-        thresholdExceeded: 1,
-        urgencyLevel: "low",
-        recommendedAction: "メール通知"
-      }
+    // 期限ちょうど（0時間）なので緊急催促と判定される
+    expect(result.shouldNotify).toBe(true);
+    expect(result.notificationType).toBe("緊急催促");
+    expect(result.delayStatus).toBe("緊急");
+    
+    // 通知先は承認者本人＋申請者＋管理者
+    expect(result.recipients).toEqual([
+      "tanaka@university.ac.jp",
+      "applicant@university.ac.jp",
+      "manager@university.ac.jp"
     ]);
+
+    // 次回催促時刻は設定される（計算ロジックに依存）
+    expect(result.nextReminderTime).toBeInstanceOf(Date);
   });
 });
