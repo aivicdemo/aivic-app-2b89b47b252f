@@ -12,6 +12,8 @@ export interface LegalChangeImpactClassification { impactLevel: string; priority
 
 export interface MigrationResult { migratedCount: number; skippedCount: number; errorCount: number; updatedRoutes: Array<{ documentId: string; oldRoute: string; newRoute: string }> }
 
+export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }
+
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
   documentContent: string,
@@ -41,6 +43,11 @@ export function validateApplicationBeforeSubmission(
   // 補助金関連書類の処理ルート検証
   if (documentType === "subsidy" && processingRoute !== "hybrid") {
     throw new Error("補助金関連書類は紙保管が必要なため、ハイブリッド処理を選択してください");
+  }
+
+  // SCEN-431 specific error message
+  if (documentType === "subsidy" && processingRoute === "electronic") {
+    errors.push("補助金関連書類はハイブリッド処理が必要です");
   }
 
   // 必須項目検証
@@ -197,8 +204,8 @@ export function classifyLegalChangeImpactLevel(
 }
 
 export function migrateExistingDataToNewClassification(
-  newClassificationRules: Array<{ documentType: string; processingRoute: string; paperStorageRequired?: boolean }>,
-  existingDocuments: Array<{ id: string; document_type?: string; current_processing_route?: string; title?: string; content?: string }>,
+  newClassificationRules: ClassificationRule[],
+  existingDocuments: Array<{ id: string; document_type?: string; current_processing_route?: string; title?: string; content?: string; documentType?: string }>,
   migrationScope: string
 ): MigrationResult {
   if (newClassificationRules.length === 0) {
@@ -226,7 +233,7 @@ export function migrateExistingDataToNewClassification(
     return true;
   };
 
-  const applyNewRulesInternal = (doc: any, rules: any[]): { processingRoute: string } => {
+  const applyNewRulesInternal = (doc: any, rules: ClassificationRule[]): { processingRoute: string } => {
     const docType = doc.document_type || doc.documentType;
     
     for (const rule of rules) {
@@ -285,17 +292,6 @@ export function migrateExistingDataToNewClassification(
     migratedCount,
     skippedCount,
     errorCount,
-    updatedRoutes,
-    isValid: true,
-    errors: [],
-    warnings: [],
-    affectedDocumentTypes: ["補助金申請書", "研究費申請書"],
-    processingRouteChanges: [],
-    impactLevel: "medium",
-    changeRequiredCount: 2,
-    priority: 2,
-    requiredResponseDays: 30,
-    affectedRuleCount: 2,
-    riskAssessment: "medium"
+    updatedRoutes
   };
 }

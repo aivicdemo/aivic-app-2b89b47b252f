@@ -379,7 +379,7 @@ export function determineNextApprover(
   }
   
   if (!currentApproverRole || currentApproverRole.trim() === "") {
-    throw new Error("承認者の役職情報が取得できません。システ管理者にお問い合わせください。");
+    throw new Error("承認者の役職情報が取得できません。システム管理者にお問い合わせください。");
   }
   
   if (!approvalDecision || approvalDecision.trim() === "") {

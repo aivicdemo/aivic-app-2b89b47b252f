@@ -404,7 +404,7 @@ export function checkApprovalDelayAndNotify(
   let delayStatus = "正常";
   let nextReminderTime: Date | null = null;
 
-  if (hoursUntilDeadline < 0) {
+  if (hoursUntilDeadline <= 0) {
     // 期限超過
     shouldNotify = true;
     notificationType = "緊急催促";
