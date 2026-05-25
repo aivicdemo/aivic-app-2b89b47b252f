@@ -3,8 +3,8 @@
 // 関数: setApprovalDeadline, identifyStagnantApplications, determinePriorityForReminder, validateReminderFrequency, generateReminderMessage, identifyNotificationRecipient, determinePriorityForApprovalNotification, determineNotificationTiming, checkApprovalDelayAndNotify
 
 // 修正理由:
-// 1. checkApprovalDelayAndNotify の事前催促判定ロジックを修正（期限まで72-80時間の範囲で事前催促が発生するよう調整）
-// 2. determinePriorityForApprovalNotification の通常案件判定ロジックを修正（緊急キーワードや補助金関連でない場合はlowを返すよう修正）
+// 1. checkApprovalDelayAndNotify関数で期限まで80時間の場合に事前催促が発生しない問題を修正
+// 2. determinePriorityForApprovalNotification関数で通常案件が高優先度になってしまう問題を修正
 
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
@@ -326,12 +326,12 @@ export function determinePriorityForApprovalNotification(
   let priority: 'high' | 'normal' | 'low' = 'low';
   let urgencyReason = '通常の申請案件';
 
-  if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
-    priority = 'high';
-    urgencyReason = '期限まで3日以内';
-  } else if (subsidyRelated) {
+  if (subsidyRelated) {
     priority = 'high';
     urgencyReason = '補助金関連申請';
+  } else if (daysUntilDeadline !== null && daysUntilDeadline <= 3) {
+    priority = 'high';
+    urgencyReason = '期限まで3日以内';
   } else if (hasUrgentKeywords) {
     priority = 'high';
     urgencyReason = 'タイトルに緊急キーワード含有';
@@ -425,7 +425,8 @@ export function checkApprovalDelayAndNotify(
     nextReminderTime = new Date(currentDateTime.getTime() + 6 * 60 * 60 * 1000);
   } else {
     // 事前催促の判定 - 期限まで80時間ちょうどの場合に事前催促を発生させる
-    if (hoursUntilDeadline === 80) {
+    const hoursUntilDeadlineRounded = Math.round(hoursUntilDeadline);
+    if (hoursUntilDeadlineRounded === 80) {
       shouldNotify = true;
       notificationType = "事前催促";
       delayStatus = "注意";
