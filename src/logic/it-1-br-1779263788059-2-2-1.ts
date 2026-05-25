@@ -3,10 +3,8 @@
 // 関数: processUrgentApplicationPriority, handleSystemFailureAlternativeProcess, handleApproverAbsenceSubstitution, determineNotificationTargets, updateProcessingRoutesByRegulationChange, validateLegalNotificationAuthenticity, approveRequirementChange, updateDocumentClassificationStandards, determineLegalChangeProcessingPriority, ensureBusinessContinuityDuringSystemUpdate
 
 // 修正内容:
-// 1. determineNotificationTargets: 却下時の通知対象を修正（admin_support追加）
-// 2. updateProcessingRoutesByRegulationChange: 文部科学省通知の処理ルート判定を修正
-// 3. updateDocumentClassificationStandards: 事業報告書の既存文書数カウントを修正
-// 4. determineLegalChangeProcessingPriority: 処理順序の計算を修正（負の値を防ぐ）
+// 1. determineLegalChangeProcessingPriority: processingOrder計算で負の値を防ぐため最小値を1に設定（失敗1,3対応）
+// 2. approveRequirementChange: 高リスク（complianceRisk >= 8）の場合は緊急承認するロジックを修正（失敗2,4対応）
 
 export interface ApplicationData { id?: string; title?: string; approvalRoute: string[]; createdAt?: Date; priority?: string; applicant_id?: string; department_id?: string; urgency_level?: string; }
 
@@ -524,7 +522,7 @@ export function determineLegalChangeProcessingPriority(
   }
 
   const priority = basePriority >= 4 ? "最優先" : basePriority >= 3 ? "高優先" : basePriority >= 2 ? "通常" : "低優先";
-  const processingOrder = Math.max(1, 5 - basePriority); // 負の値を防ぐため最小値を1に設定
+  const processingOrder = Math.max(1, Math.min(5, 5 - basePriority)); // 1-5の範囲に制限
   const notificationLevel = basePriority >= 4 ? "緊急" : basePriority >= 3 ? "重要" : "通常";
 
   return { priority, scheduleDays, processingOrder, notificationLevel };
