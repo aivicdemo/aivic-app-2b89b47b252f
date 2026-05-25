@@ -18,6 +18,14 @@ export interface ExceptionHandlingResult { finalDocumentType: string; processing
 
 export interface StorageMethodResult { documentType: string; processingRoute: 'electronic' | 'hybrid'; subsidyRelated: boolean; paperStorageRequired: boolean }
 
+export interface ClassificationRule { documentType: string; processingRoute: string; }
+
+export interface ValidateApplicationRequiredFields { 申請金額?: string; }
+
+export interface ProcessingRouteUpdate { documentType: string; processingRoute?: string; oldRoute?: string; newRoute?: string; from?: any; to?: any; }
+
+export interface ChangeRequirement { documentType: string; from: any; to: any; }
+
 export function validateApplicationInput(
   documentTitle: string,
   documentContent: string,
@@ -310,9 +318,9 @@ export function checkMoeComplianceRequirements(
   // コンプライアンス状況
   const complianceStatus = paperStorageRequired ? 'compliant' : 'review_required';
   
-  // リスクレベル
+  // リスクレベル - 修正: 高い関連度の場合にhighを返すよう調整
   let riskLevel: string;
-  if (keywordScore >= 0.8) {
+  if (keywordScore >= 0.7) {
     riskLevel = 'high';
   } else if (keywordScore >= 0.4) {
     riskLevel = 'medium';
@@ -347,6 +355,8 @@ export function determineDigitalizationEligibility(
   const subsidyRelated = subsidyRelevanceScore >= 0.7;
   const moeRequiredTypes = ["補助金申請書", "事業報告書", "会計報告書", "監査資料"];
   const paperStorageRequired = subsidyRelated && moeRequiredTypes.includes(documentType);
+  
+  // 修正: 判定基準が曖昧な場合でも、subsidyRelevanceScoreが0.7未満なら電子処理
   const processingRoute = paperStorageRequired ? "hybrid" : "electronic";
 
   return {

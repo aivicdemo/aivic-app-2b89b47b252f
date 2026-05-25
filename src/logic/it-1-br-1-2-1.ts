@@ -356,7 +356,8 @@ export function determineNotificationTiming(
     app.priority === "high" && (currentTime.getTime() - app.createdAt.getTime()) > 24 * 60 * 60 * 1000
   );
   
-  const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0);
+  // 修正: 業務負荷が高い場合は通知を抑制
+  const shouldSendNotification = hasUrgentCases || (!shouldSuppressNormal && pendingApplications.length > 0 && approverWorkload <= 80);
   
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
