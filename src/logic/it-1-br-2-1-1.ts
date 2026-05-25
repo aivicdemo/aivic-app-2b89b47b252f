@@ -277,9 +277,7 @@ export function checkMoeComplianceRequirements(
   documentTitle: string,
   documentContent: string,
   applicantDepartment: string,
-  moeRequirements?: string[],
-  classificationRules?: ClassificationRule[],
-  changeLog?: ChangeLog
+  moeRequirements?: string[]
 ): ComplianceCheckResult {
   // バリデーション
   if (!documentTitle || documentTitle.trim() === '') {
