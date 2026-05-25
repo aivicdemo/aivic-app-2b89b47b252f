@@ -362,6 +362,11 @@ export function determineNotificationTiming(
     shouldSendNotification = true;
   }
   
+  // 業務負荷が90%以上の場合は通知を抑制
+  if (approverWorkload >= 90) {
+    shouldSendNotification = false;
+  }
+  
   let baseFrequency = applicationPriority === "high" ? 0 : applicationPriority === "medium" ? 60 : 180;
   
   if (approverWorkload > 80) {

@@ -27,8 +27,8 @@ export interface DocumentTypeAndRouteResult {
 }
 
 interface ValidateApplicationRequiredFields {
-  申請金額: any;
-  実施期間: any;
+  申請金額?: any;
+  実施期間?: any;
   [key: string]: any;
 }
 
@@ -91,7 +91,7 @@ export function validateApplicationBeforeSubmission(
   const affectedRuleCount = 2;
   const riskAssessment = "medium";
 
-  // MigrationResult の情報 - 修正: subsidy + hybrid の場合の条件を変更
+  // MigrationResult の情報
   const migratedCount = 1;
   const skippedCount = 1;
   const errorCount = 0;
@@ -176,7 +176,7 @@ export function analyzeRegulationImpactScope(
     impactLevel = "重大";
   }
 
-  // 修正: 100件を超える場合は「重大」に設定
+  // 100件を超える場合は「重大」に設定
   if (currentDocumentTypes.length > 100) {
     impactLevel = "重大";
   }
@@ -232,6 +232,10 @@ export function classifyLegalChangeImpactLevel(
     impactLevel = "medium";
     priority = 2;
     requiredResponseDays = 30;
+  } else if (hasSubsidyRequirementChange) {
+    impactLevel = "high";
+    priority = 1;
+    requiredResponseDays = 14;
   }
   
   const riskAssessment = impactLevel === "high" ? "法令違反リスク高" : 
@@ -320,7 +324,7 @@ export function migrateExistingDataToNewClassification(
 
   for (const document of targetDocuments) {
     try {
-      // 修正: titleがnullの場合はエラーとしてカウント
+      // titleがnullの場合はエラーとしてカウント
       if (document.title === null) {
         errorCount++;
         continue;
