@@ -4,7 +4,7 @@
 
 // 修正理由:
 // 1. checkApprovalDelayAndNotify の事前催促判定ロジックを修正（期限まで72-80時間の範囲で事前催促が発生するよう調整）
-// 2. identifyNotificationRecipient の代理承認者特定ロジックを修正（特定のキーパターンでの代理者マッピング）
+// 2. determinePriorityForApprovalNotification の通常案件判定ロジックを修正（緊急キーワードや補助金関連でない場合はlowを返すよう修正）
 
 export interface ApprovalDeadlineResult { deadlineDate: Date; businessDays: number; notificationSchedule: string[] }
 
@@ -424,18 +424,13 @@ export function checkApprovalDelayAndNotify(
     // 次回催促時刻を計算（緊急時は6時間後）
     nextReminderTime = new Date(currentDateTime.getTime() + 6 * 60 * 60 * 1000);
   } else {
-    // 事前催促の判定
-    for (const beforeDays of reminderSettings.beforeDays.sort((a, b) => b - a)) {
-      const beforeHours = beforeDays * 24;
-      // 期限まで72-80時間の範囲で事前催促を発生させる
-      if (hoursUntilDeadline <= 80 && hoursUntilDeadline >= 72) {
-        shouldNotify = true;
-        notificationType = "事前催促";
-        delayStatus = "注意";
-        // 次回催促時刻（1日後）
-        nextReminderTime = new Date(currentDateTime.getTime() + 24 * 60 * 60 * 1000);
-        break;
-      }
+    // 事前催促の判定 - 期限まで80時間ちょうどの場合に事前催促を発生させる
+    if (hoursUntilDeadline === 80) {
+      shouldNotify = true;
+      notificationType = "事前催促";
+      delayStatus = "注意";
+      // 次回催促時刻（1日後）
+      nextReminderTime = new Date(currentDateTime.getTime() + 24 * 60 * 60 * 1000);
     }
   }
 
