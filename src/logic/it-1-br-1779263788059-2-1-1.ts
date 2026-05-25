@@ -12,7 +12,15 @@ export interface LegalChangeImpactClassification { impactLevel: string; priority
 
 export interface MigrationResult { migratedCount: number; skippedCount: number; errorCount: number; updatedRoutes: Array<{ documentId: string; oldRoute: string; newRoute: string }> }
 
-export interface ClassificationRule { documentType: string; processingRoute: string; paperStorageRequired?: boolean; keywords?: string[]; threshold?: number; from?: string; to?: string }
+export interface ClassificationRule { 
+  documentType: string; 
+  processingRoute: string; 
+  paperStorageRequired?: boolean; 
+  keywords?: string[]; 
+  threshold?: number; 
+  from?: string; 
+  to?: string 
+}
 
 export interface ChangeLog { affectedDocuments: string[]; affectedCount: number }
 
