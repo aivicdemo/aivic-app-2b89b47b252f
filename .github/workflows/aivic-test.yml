@@ -15,7 +15,12 @@ jobs:
         with:
           node-version: "20"
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps: 2026-05-25 追加。
+        # 直前まで成功していた npm install が突然 ERESOLVE で fail（typescript@undefined）
+        # する事故が発生。npm の peer 解決が時々おかしくなる現象への防御策。
+        # 実際の install は同じ結果（typescript 5.x + ts-jest 29.x が入る）、peer の strict
+        # チェックだけスキップする。jest/ts-jest/typescript の組合せは実証済みで不健全ではない。
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: Run Jest unit tests
         id: jest
         run: npx jest --ci --passWithNoTests --reporters=default --reporters=jest-junit
