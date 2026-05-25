@@ -68,6 +68,11 @@ export interface DocumentTypeRouteResult {
   paperStorageRequired?: boolean;
 }
 
+export interface ApprovedChange {
+  from: string;
+  to: string;
+}
+
 export function validateApplicationBeforeSubmission(
   documentTitle: string,
   documentContent: string,
@@ -148,7 +153,9 @@ export function analyzeRegulationImpactScope(
       if (regulationChangeContent.includes("紙保管を必須") || 
           regulationChangeContent.includes("電子保存要件が変更") ||
           regulationChangeContent.includes("紙保管") ||
-          regulationChangeContent.includes("電子保管について")) {
+          regulationChangeContent.includes("電子保管について") ||
+          regulationChangeContent.includes("電子保管") ||
+          regulationChangeContent.includes("保管要件")) {
         if (currentRoute === "electronic") {
           newRoute = "hybrid";
         }

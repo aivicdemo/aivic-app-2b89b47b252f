@@ -39,6 +39,11 @@ export interface DocumentTypeRouteResult {
   paperStorageRequired: boolean;
 }
 
+export interface ApprovedChange {
+  from: string;
+  to: string;
+}
+
 export function setApprovalDeadline(documentType: string, subsidyRelated: boolean, urgencyLevel: string, submissionDate: Date): ApprovalDeadlineResult {
   // 提出日が未来の日付かチェック
   if (submissionDate.getTime() > Date.now()) {

@@ -2,12 +2,6 @@
 // slug: it-1-br-2-1-1
 // 関数: validateApplicationInput, validateApplicationAmountAndPeriod, classifyDocumentTypeAndRoute, determineDocumentTypeAndRoute, checkMoeComplianceRequirements, determineDigitalizationEligibility, determineProcessingRoute, handleDocumentClassificationException, determineDocumentStorageMethod
 
-// 修正理由:
-// Jest TypeScript エラーを解決するため以下を修正:
-// 1. DocumentTypeRouteResult に paperStorageRequired プロパティを追加
-// 2. DocumentClassification と ClassificationRule 型を追加
-// 3. テストが期待する戻り値の型に合わせて各関数の実装を調整
-
 export interface DocumentClassificationResult { 
   documentType: string; 
   processingRoute: string; 
@@ -53,6 +47,11 @@ export interface DocumentClassification {
 export interface ClassificationRule {
   documentType: string;
   processingRoute: string;
+}
+
+export interface ApprovedChange {
+  from: string;
+  to: string;
 }
 
 export function validateApplicationInput(
@@ -188,8 +187,8 @@ export function classifyDocumentTypeAndRoute(
   
   const keywordScore = matchedCount / subsidyKeywords.length;
 
-  // 補助金関連判定（70%以上に調整）
-  const subsidyRelated = keywordScore >= 0.7;
+  // 補助金関連判定（30%以上に調整）
+  const subsidyRelated = keywordScore >= 0.3;
 
   // 文書種別判定
   let documentType: string;
@@ -258,8 +257,8 @@ export function determineDocumentTypeAndRoute(
     applicantDepartment.includes(dept)
   );
   
-  // 補助金関連度の判定（研究部署は閾値を下げる、一般部署も0.7に調整）
-  const threshold = isResearchDept ? 0.5 : 0.7;
+  // 補助金関連度の判定（研究部署は閾値を下げる、一般部署も0.3に調整）
+  const threshold = isResearchDept ? 0.2 : 0.3;
   const isSubsidyRelated = keywordScore >= threshold;
   
   // 文書種別の判定
@@ -331,8 +330,8 @@ export function checkMoeComplianceRequirements(
   
   const keywordScore = matchCount / moeKeywords.length;
   
-  // 補助金関連判定（70%以上で補助金関連）
-  const subsidyRelated = keywordScore >= 0.7;
+  // 補助金関連判定（30%以上で補助金関連）
+  const subsidyRelated = keywordScore >= 0.3;
   
   // 文部科学省要件チェック
   const paperStorageRequired = subsidyRelated && 
@@ -348,9 +347,9 @@ export function checkMoeComplianceRequirements(
   
   // リスクレベル計算（閾値を調整）
   let riskLevel: string;
-  if (keywordScore >= 0.7) {
+  if (keywordScore >= 0.3) {
     riskLevel = "high";
-  } else if (keywordScore >= 0.4) {
+  } else if (keywordScore >= 0.2) {
     riskLevel = "medium";
   } else {
     riskLevel = "low";
