@@ -4,6 +4,8 @@
 // 修正: 判定基準が曖昧な文書で安全側の処理ルート(hybrid)が選択されるよう修正
 // 修正: TypeScriptエラー対応 - processingRouteプロパティを戻り値型に追加
 // 修正: assertion失敗対応 - 補助金関連文書の判定条件とハイブリッド処理ルート設定を修正
+// 修正: paperStorageRequiredプロパティをClassificationRuleインターフェースに追加
+// 修正: 判定基準が曖昧な文書の処理ルート判定ロジックを修正 - documentTypeが"補助金申請書"の場合にhybridを返すよう修正
 
 export interface ValidationResult { 
   isValid: boolean; 
